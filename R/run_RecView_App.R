@@ -7,7 +7,7 @@
 #' @export
 run_RecView_App <- function() {
   options(shiny.maxRequestSize = 1000*1024^2)
-  #shiny::shinyApp(RecViewR:::recview_ui, RecViewR:::recview_server)
-  shiny::runGadget(RecViewR:::recview_ui, RecViewR:::recview_server, viewer = shiny::paneViewer(minHeight = 800))
+  #shiny::shinyApp(RecView:::recview_ui, RecView:::recview_server)
+  shiny::runGadget(RecView:::recview_ui, RecView:::recview_server, viewer = shiny::paneViewer(minHeight = 800))
 }
 
