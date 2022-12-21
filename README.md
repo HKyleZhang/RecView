@@ -1,6 +1,6 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-# RecViewR<br><sub>- _view_ and _locate_ recombinations positions using pedigree data -</sub>
+# RecView<br><sub>- _view_ and _locate_ recombinations positions using pedigree data -</sub>
 
 This R package is designed to distribute the _RecView_ ShinyApp which aims at providing a user-friendly GUI for viewing and locating recombination positions on chromosomes using pedigree data.
 
@@ -8,7 +8,7 @@ This R package is designed to distribute the _RecView_ ShinyApp which aims at pr
 
 ## Installation
 
-`remotes::install_github("HKyleZhang/RecViewR")`
+`remotes::install_github("HKyleZhang/RecView")`
 
 + Installation will install these dependencies: 
   * shiny (>= 1.7.1)
