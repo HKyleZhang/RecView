@@ -1,4 +1,4 @@
-Package: RecViewR
+Package: RecView
 Type: Package
 Title: View and Locate Recombination Positions Using Pedigree Data
 Version: 1.0.0
