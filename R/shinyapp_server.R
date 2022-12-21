@@ -5,7 +5,7 @@ recview_server <- function(input, output, session) {
   ### Banner ----
   output$title <- renderImage({
     rnum <- sample(x = c(1, 2, 3), size = 1)
-    list(src = list.files(path = system.file("banner", package = "RecViewR"), pattern = paste0("banner_", rnum, ".png"), full.names = T),
+    list(src = list.files(path = system.file("banner", package = "RecView"), pattern = paste0("banner_", rnum, ".png"), full.names = T),
          width = 383,
          height = 70)
   }, deleteFile = FALSE)
@@ -149,7 +149,7 @@ recview_server <- function(input, output, session) {
   ## 2.2 Main ----
   ### 2.2.1 Function to analyse recombination locations ----
   rec_analyse <- function(data, sc_order, chromosome, offspring, loc, alg, thrsd, radius, step, finer_step, finer_threshold) {
-    dt_path <- system.file("dictionary", package = "RecViewR")
+    dt_path <- system.file("dictionary", package = "RecView")
     dictionary <- read_tsv(file = list.files(path = dt_path, pattern = "dict_complete.tsv", full.names = T),
                            col_types = cols())
     if ((chromosome != "Z") && (chromosome != "X")) {
