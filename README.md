@@ -54,16 +54,16 @@ Scaffold file | One .csv file having the order and orientation of the reference 
 * __Locate recombination positions?__ Check 'Yes' to locate recombination positions with either of two algorithms (see below).
 
 * __Algorithms (optional):__ 
-  + SLW: Sliding Window algorithm proceeds by specifying a window size (the number of informative SNPs of each flanking window), a step value (k) giving the number of SNPs between each calculated position, and a threshold to trigger denser calculations (at every SNP) to detect local maxima.
+  + PD: Proportional Difference algorithm proceeds by specifying a window size (the number of informative SNPs of each flanking window), a step value (k) giving the number of SNPs between each calculated position, and a threshold to trigger denser calculations (at every SNP) to detect local maxima.
   + CCS: Cumulative Continuity Score algorithm calculates a CCS for each position along the chromosome, and (ii) finds putative recombination positions by locating regions where long continuously increasing slopes of CCSs of one grandparent-of-origin is replaced by long continuously increasing slopes of CCSs from the other grandparent. 
 
-* __Radius value (SLW optional)__: the number of informative SNPs around the examined position for calculating the proportion of informative SNPs from specific grandparents.
+* __Radius value (PD optional)__: the number of informative SNPs around the examined position for calculating the proportion of informative SNPs from specific grandparents.
 
-* __Step value (SLW optional)__: the step size to move along the chromosome. Larger values decrease the number of positions to be examined, while increasing analysis speed.
+* __Step value (PD optional)__: the step size to move along the chromosome. Larger values decrease the number of positions to be examined, while increasing analysis speed.
 
-* __Finer step value (SLW optional)__: the step size to move along the chromosome, after the absolute difference of the proportion of grandparent-of-origin reaches above the threshold. Larger value decreases the positions to be examined, while increasing the analysis speed.
+* __Finer step value (PD optional)__: the step size to move along the chromosome, after the absolute difference of the proportion of grandparent-of-origin reaches above the threshold. Larger value decreases the positions to be examined, while increasing the analysis speed.
 
-* __Threshold (SLW optional):__ the condition to initiate a finer step, and later filter the local maxima for _effectively true_ recombination.
+* __Threshold (PD optional):__ the condition to initiate a finer step, and later filter the local maxima for _effectively true_ recombination.
 
 * __Threshold (CCS optional):__ the minimal CCS to consider an _effectively true_ recombination. Larger value is more stringent and captures crossovers, while small value captures both crossovers and non-crossovers. However, small values can also capture artefacts of recombination due to wrongly called genotypes.
 
