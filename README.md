@@ -94,10 +94,11 @@ For big VCF file, it is recommended to continue with __Workflow A__.
   
 <br>
 
-## Citation
-xxxx.2022.
+## Please cite:
+
+Zhang H, Hansson B. RecView: an interactive R application for viewing and locating recombination positions using pedigree data. BioRxiv 2022:2022.12.21.521365. doi:10.1101/2022.12.21.521365.
 
 <br>
 
 ## Version history
-+ version 1.0.0: Month Date, 2022
++ version 1.0.0: Dec, 2022
