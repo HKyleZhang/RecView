@@ -6,6 +6,10 @@ This R package is designed to distribute the _RecView_ ShinyApp which aims at pr
 
 <br>
 
+![](https://github.com/HKyleZhang/Thesis_Figure_and_Supplementary/blob/main/3.Paper-III_RecView/Figure/Figure_06.png)
+
+<br>
+
 ## Installation
 
 `remotes::install_github("HKyleZhang/RecView")`
