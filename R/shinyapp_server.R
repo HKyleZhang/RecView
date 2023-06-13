@@ -632,9 +632,9 @@ recview_server <- function(input, output, session) {
     if (resolution == "Low") {
       p1 <- ggplot(data = res[[1]]) +
         scattermore::geom_scattermore(aes(x = POS_chr_mb, y = Grandparent_of_origin_value, color = scaffold_orientation),
-                                      pointsize = 1, position = position_jitter(height = 0.2), pixels = c(2048, 360)) +
+                                      pointsize = 1, position = position_jitter(height = 0.2), pixels = c(1500, 264)) +
         scattermore::geom_scattermore(data = ex_tb, aes(x = POS_chr_mb, y = Grandparent_of_origin_value), alpha = 0,
-                                      pointsize = 0, pixels = c(2048, 360))
+                                      pointsize = 0, pixels = c(1500, 264))
     } else {
       p1 <- ggplot(data = res[[1]]) +
         geom_point(aes(x = POS_chr_mb, y = Grandparent_of_origin_value, color = scaffold_orientation),
@@ -744,11 +744,11 @@ recview_server <- function(input, output, session) {
         filter(y_facet_group != 0)
       
       plot_scale <- 0.35
-      plot_panel_height <- 40 / (1 - 2*plot_scale)
+      plot_panel_height <- 35 / (1 - 2*plot_scale)
       plot_panel_width <- 2048
       
       p2_part1_1 <- ggplot(data = part1) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height)) +
+        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * plot_scale)) +
         facet_wrap(~Side) +
         scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
         scale_y_continuous(limits = c(part1_min, part1_max), breaks = break_interval_1) +
@@ -772,7 +772,7 @@ recview_server <- function(input, output, session) {
               strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
           
       p2_part1_2 <- ggplot(data = part1) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height)) +
+        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * (1 - 2*plot_scale))) +
         facet_wrap(~Side) +
         scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
         ylim(part1_min, part1_max) +
@@ -795,7 +795,7 @@ recview_server <- function(input, output, session) {
               strip.background = element_blank())
       
       p2_part1_3 <- ggplot(data = part1) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height)) +
+        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * plot_scale)) +
         facet_wrap(~Side) +
         scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
         scale_y_continuous(limits = c(part1_min, part1_max), breaks = break_interval_2) +
@@ -834,7 +834,7 @@ recview_server <- function(input, output, session) {
       }
       
       p2_part2_1 <- ggplot(data = part2) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height)) +
+        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * plot_scale)) +
         facet_wrap(~Side) +
         scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
         scale_y_continuous(limits = c(part2_min, part2_max), breaks = break_interval_1) +
@@ -856,7 +856,7 @@ recview_server <- function(input, output, session) {
               strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
       
       p2_part2_2 <- ggplot(data = part2) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height)) +
+        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * (1 - 2*plot_scale))) +
         facet_wrap(~Side) +
         scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
         ylim(part2_min, part2_max) +
@@ -879,7 +879,7 @@ recview_server <- function(input, output, session) {
               strip.background = element_blank())
       
       p2_part2_3 <- ggplot(data = part2) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height)) +
+        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * plot_scale)) +
         facet_wrap(~Side) +
         scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
         scale_y_continuous(limits = c(part2_min, part2_max), breaks = break_interval_2) +
