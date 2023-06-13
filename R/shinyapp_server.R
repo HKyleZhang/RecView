@@ -650,7 +650,7 @@ recview_server <- function(input, output, session) {
            title = paste0(offspring, '; Chr', chromosome),
            color = "Scaffold\nOrientation") +
       facet_wrap(~Side, scales = "free_y", nrow = 2, strip.position = "top") +
-      scale_y_continuous(breaks = c(0,1,2,3), labels = c("D", "C", "B", "A")) +
+      scale_y_continuous(breaks = c(0,1,2,3), labels = c("MGM", "MGF", "PGM", "PGF")) +
       scale_color_manual(values = colour_scheme) +
       guides(color = guide_legend(override.aes = list(size=10))) +
       theme(plot.title = element_text(size = 20, face = "bold"),
