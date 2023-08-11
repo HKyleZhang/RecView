@@ -4,7 +4,7 @@
 recview_ui <- function(request) {
   fluidPage(
     shinyjs::useShinyjs(),
-    h6("version 1.0.0"),
+    h6("version 1.0.1"),
     imageOutput("title", height = "70px", width = "383px"),
     h5("Maintainer: Hongkai Zhang"),
     sidebarPanel(width = 3,
@@ -46,7 +46,7 @@ recview_ui <- function(request) {
         ),
         conditionalPanel(
           condition = "input.algorithm == 'CCS'",
-          textInput(inputId = "threshold", label = "Threshold value", width = "95%", placeholder = "default: 30")
+          textInput(inputId = "threshold", label = "Threshold value", width = "95%", placeholder = "default: 50")
         ),
         checkboxGroupInput(inputId = "save_opt2", label = "Saving options", choices = c("GoO Inferences", "Plots", "Locations"))
       ),
