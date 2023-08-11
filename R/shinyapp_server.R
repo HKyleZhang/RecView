@@ -134,7 +134,7 @@ recview_server <- function(input, output, session) {
     if (input$threshold != '') {
       input$threshold %>% as.numeric()
     } else {
-      30
+      50
     }
   })
   ### Obtain saving setting ----
@@ -359,9 +359,9 @@ recview_server <- function(input, output, session) {
           }
 
           if (sepa[[2]] == "incl") {
-            tb_zero <- tb[sepa[[1]][1:(length(sepa[[1]])-1)],] %>% mutate(continuity = 0)
+            tb_zero <- tb[sepa[[1]][1:(length(sepa[[1]])-1)],] %>% mutate(continuity = 0, abs_cumulative_continuity = 0)
           } else {
-            tb_zero <- tb[sepa[[1]][1:length(sepa[[1]])],] %>% mutate(continuity = 0)
+            tb_zero <- tb[sepa[[1]][1:length(sepa[[1]])],] %>% mutate(continuity = 0, abs_cumulative_continuity = 0)
           }
 
           tb_list <- list()
@@ -499,12 +499,12 @@ recview_server <- function(input, output, session) {
                                 breaks = hist_pat$breaks[1:(length(hist_pat$breaks)-1)],
                                 Counts = hist_pat$counts[1:length(hist_pat$counts)]) %>%
         mutate(Density = Counts / interval,
-               Estimated_error = interval / Counts,
+               Precision = interval / Counts,
                POS_chr_mb = POS_chr / 1e6,
                Side = "Paternal")
     } else {
       snp_density_pat <- tibble(POS_chr = NA, breaks = NA, Counts = NA,
-                                Density = NA, Estimated_error = NA, POS_chr_mb = NA,
+                                Density = NA, Precision = NA, POS_chr_mb = NA,
                                 Side = "Paternal")
     }
 
@@ -517,17 +517,17 @@ recview_server <- function(input, output, session) {
                                 breaks = hist_mat$breaks[1:(length(hist_mat$breaks)-1)],
                                 Counts = hist_mat$counts[1:length(hist_mat$counts)]) %>%
         mutate(Density = Counts / interval,
-               Estimated_error = interval / Counts,
+               Precision = interval / Counts,
                POS_chr_mb = POS_chr / 1e6,
                Side = "Maternal")
     } else {
       snp_density_mat <- tibble(POS_chr = NA, breaks = NA, Counts = NA,
-                                Density = NA, Estimated_error = NA, POS_chr_mb = NA,
+                                Density = NA, Precision = NA, POS_chr_mb = NA,
                                 Side = "Maternal")
     }
 
     res[[4]] <- rbind(snp_density_pat, snp_density_mat) %>%
-      mutate(Estimated_error = na_if(Estimated_error, Inf))
+      mutate(Precision = na_if(Precision, Inf))
     res[[4]]$Side <- factor(res[[4]]$Side, levels = c("Paternal", "Maternal"))
 
 
@@ -546,7 +546,7 @@ recview_server <- function(input, output, session) {
           ee <- tb %>%
             filter(Side == side) %>%
             .[boolean,] %>%
-            get("Estimated_error",.) %>%
+            get("Precision",.) %>%
             round()
 
          } else {
@@ -567,7 +567,7 @@ recview_server <- function(input, output, session) {
          select(-index) %>%
          select(Origin, `Scaffold & Orientation`, `Chromosomal position (bp)`, Esimated_error, `Chromosomal position (Mb)`, everything()) %>%
          `colnames<-`(.,c("Origin", "Scaffold & Orientation", "Chromosomal position (bp)",
-                          "Esimated error (bp)", "Chromosomal position (Mb)", colnames(res[[3]])[5:length(colnames(res[[3]]))]))
+                          "Precision (bp)", "Chromosomal position (Mb)", colnames(res[[3]])[5:length(colnames(res[[3]]))]))
 
     }
 
@@ -613,6 +613,12 @@ recview_server <- function(input, output, session) {
       break_step <- 0.25
     }
 
+    if (nrow(res[[1]]) < 2000) {
+      point_size <- 6
+    } else {
+      point_size <- exp(-8.407e-08 * nrow(res[[1]]) + 0.9498) %>% round(1)
+    }
+    
     macaron_mod <- c("#940214", "#3e1f16", "#123358", "#e8c001", "#015c7a", "#85ab87", "#d75624", "#dd395a")
     n_scaffold <- res[[1]]$scaffold_orientation %>% unique() %>% length()
     n_colour <- ceiling(n_scaffold / 2)
@@ -632,7 +638,7 @@ recview_server <- function(input, output, session) {
     if (resolution == "Low") {
       p1 <- ggplot(data = res[[1]]) +
         scattermore::geom_scattermore(aes(x = POS_chr_mb, y = Grandparent_of_origin_value, color = scaffold_orientation),
-                                      pointsize = 1, position = position_jitter(height = 0.2), pixels = c(1500, 264)) +
+                                      pointsize = point_size, position = position_jitter(height = 0.2), pixels = c(1500, 264)) +
         scattermore::geom_scattermore(data = ex_tb, aes(x = POS_chr_mb, y = Grandparent_of_origin_value), alpha = 0,
                                       pointsize = 0, pixels = c(1500, 264))
     } else {
@@ -649,7 +655,7 @@ recview_server <- function(input, output, session) {
            y = "Grandparent-of-origin",
            title = paste0(offspring, '; Chr', chromosome),
            color = "Scaffold\nOrientation") +
-      facet_wrap(~Side, scales = "free_y", nrow = 2, strip.position = "top") +
+      facet_wrap(~Side, scales = "free_y", nrow = 2, strip.position = "right") +
       scale_y_continuous(breaks = c(0,1,2,3), labels = c("MGM", "MGF", "PGM", "PGF")) +
       scale_color_manual(values = colour_scheme) +
       guides(color = guide_legend(override.aes = list(size=10))) +
@@ -696,12 +702,12 @@ recview_server <- function(input, output, session) {
     
     if (algorithm == "PD") {
       p2 <- ggplot(data = res[[2]]) +
-        geom_line(aes(x = POS_chr_mb, y = diff, group = Side), size = 0.1, color = "#C91959") +
-        geom_point(aes(x = POS_chr_mb, y = diff), size = 0.1, color = "#C91959") +
+        geom_line(aes(x = POS_chr_mb, y = diff, group = Side), size = 0.2, color = "#C91959") +
+        geom_point(aes(x = POS_chr_mb, y = diff), size = 0.5, color = "#C91959") +
         scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
         scale_y_continuous(limits = c(-0.05,1.05), breaks = seq(0,1,0.2)) +
-        coord_cartesian(xlim = c(-max(res[[2]]$POS_chr_mb)*0.01, max(res[[2]]$POS_chr_mb)*1.01), expand = F) +
-        facet_wrap(~Side, nrow = 2, strip.position="top") +
+        coord_cartesian(xlim = c(-max(res[[1]]$POS_chr_mb)*0.01, max(res[[1]]$POS_chr_mb)*1.01), expand = F) +
+        facet_wrap(~Side, nrow = 2, strip.position = "right") +
         labs(x = "Chromosomal position (Mb)",
              y = "Abs. GoO prop. diff.",
              title = paste0(offspring, '; Chr', chromosome)) +
@@ -718,189 +724,73 @@ recview_server <- function(input, output, session) {
       
       p2 <- list(p2)
     } else if (algorithm == "CCS") {
-      part1 <- res[[2]] %>% filter(Side == "Paternal")
-      if (max(part1$continuity) < 1000) {
-         part1_max <- 1000
-         break_interval_1 <- c(100, 500)
-       } else {
-         part1_max <- max(part1$continuity)
-         break_interval_1 <- c(1000, round_any(x = part1_max, accuracy = 1000, f = floor))
-       }
+      tb <- res[[2]] %>% mutate(sign = ifelse(continuity >= 0, 1, -1))
       
-       if (min(part1$continuity) > -1000) {
-         part1_min <- -1000
-         break_interval_2 <- c(-100, -500)
-       } else {
-         part1_min <- min(part1$continuity)
-         break_interval_2 <- c(-1000, round_any(x = part1_min, accuracy = 1000, f = ceiling))
-       }
-      plot_cut_point <- threshold + 10
+      tb_list <- list()
+      zeros <- which(tb$continuity == 0)
+      k <- 1
+      for (i in 1:(length(zeros) - 1)) {
+        intermediate <- tb[c(zeros[i], zeros[i + 1] - 1),] %>% mutate(line_group = k)
+        
+        if(tb$abs_cumulative_continuity[zeros[i] + 1] >= threshold) {
+          intermediate <- intermediate %>% mutate(sign = prod(sign))
+        } else {
+          intermediate <- intermediate %>% mutate(sign = 2)
+        }
+        
+        tb_list[[k]] <- intermediate %>% select(Side, POS_chr_mb, sign, line_group)
+        k <- k + 1
+      }
       
-      part1 <- part1 %>% 
-        mutate(y_facet_group1 = ifelse(continuity >= plot_cut_point, 1, 0)) %>% 
-        mutate(y_facet_group2 = ifelse(abs(continuity) <= plot_cut_point, 2, 0)) %>% 
-        mutate(y_facet_group3 = ifelse(continuity <= -plot_cut_point, 3, 0)) %>% 
-        mutate(y_facet_group = y_facet_group1 + y_facet_group2 +y_facet_group3) %>% 
-        filter(y_facet_group != 0)
+      if(zeros[length(zeros)] != nrow(tb)) {
+        intermediate <- tb[c(zeros[length(zeros)], nrow(tb)),] %>% mutate(line_group = length(tb_list) + 1)
+        
+        if(tb$abs_cumulative_continuity[zeros[length(zeros)] + 1] >= threshold) {
+          intermediate <- intermediate %>% mutate(sign = prod(sign))
+        } else {
+          intermediate <- intermediate %>% mutate(sign = 2)
+        }
+        tb_list[[length(tb_list) + 1]] <- intermediate %>% select(Side, POS_chr_mb, sign, line_group)
+      }
       
-      plot_scale <- 0.35
-      plot_panel_height <- 35 / (1 - 2*plot_scale)
-      plot_panel_width <- 2048
+      tb_list <- reduce(tb_list, bind_rows) %>% mutate(CCS = "NA")
+      tb_list$CCS[tb_list$sign == -1] <- paste0("<= -", threshold)
+      tb_list$CCS[tb_list$sign == 1] <- paste0(">= ", threshold)
+      tb_list$CCS[tb_list$sign == 2] <- paste0("< |", threshold, "|")
       
-      p2_part1_1 <- ggplot(data = part1) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * plot_scale)) +
-        facet_wrap(~Side) +
+      tb_list$Side <- factor(tb_list$Side, levels = c("Paternal", "Maternal"))
+      tb_list$CCS <- factor(tb_list$CCS, levels = c(paste0("<= -", threshold), paste0(">= ", threshold), paste0("< |", threshold, "|")))
+      cols <- setNames(c("#81BECE", "#E45545", "black"), c(paste0("<= -", threshold), paste0(">= ", threshold), paste0("< |", threshold, "|")))
+      
+      p2 <- ggplot(data = tb_list) +
+        geom_line(aes(x = POS_chr_mb, y = "CCS", group = line_group, color = CCS), linewidth = 13) +
+        facet_wrap(~Side, scales = "free_y", nrow = 2, strip.position = "right") +
         scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
-        scale_y_continuous(limits = c(part1_min, part1_max), breaks = break_interval_1) +
-        coord_cartesian(ylim = c(plot_cut_point, part1_max), xlim = c(-max(part1$POS_chr_mb)*0.01, max(part1$POS_chr_mb)*1.01), expand = F) +
-        labs(x = "Chromosomal position (Mb)",
-             y = "CCS",
+        coord_cartesian(xlim = c(-max(res[[1]]$POS_chr_mb)*0.01, max(res[[1]]$POS_chr_mb)*1.01), expand = F) +
+        scale_color_manual(values = cols) +
+        labs(x = "Chromosomal position (Mb)", 
              title = paste0(offspring, '; Chr', chromosome)) +
-        theme_bw() +
+        guides(color = guide_legend(override.aes = list(size=8))) +
         theme(plot.title = element_text(size = 20, face = "bold"),
-              plot.margin = margin(0.3,0,0.3,0, unit = "mm"),
-              panel.border = element_rect(color = "grey10", size = 0.5, fill = NA),
-              panel.grid.minor = element_blank(),
-              panel.grid.major = element_line(color = "grey60", size = 0.2),
-              axis.text.x= element_blank(),
-              axis.text.y = element_text(size = 12, color = "black"),
-              axis.title.x = element_blank(),
-              axis.title.y = element_blank(),
-              axis.ticks.x = element_blank(),
-              legend.position = "none",
-              strip.text = element_text(size = 16, color = "black"),
-              strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
-          
-      p2_part1_2 <- ggplot(data = part1) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * (1 - 2*plot_scale))) +
-        facet_wrap(~Side) +
-        scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
-        ylim(part1_min, part1_max) +
-        coord_cartesian(ylim = c(-plot_cut_point, plot_cut_point), xlim = c(-max(part1$POS_chr_mb)*0.01, max(part1$POS_chr_mb)*1.01), expand = F) +
-        labs(x = "Chromosomal position (Mb)",
-             y = "CCS") +
-        theme_bw() +
-        theme(plot.title = element_text(size = 20, face = "bold"),
-              plot.margin = margin(0.3,0,0.3,0, unit = "mm"),
-              panel.border = element_rect(color = "grey10", size = 0.5, fill = NA),
-              panel.grid.minor = element_blank(),
-              panel.grid.major = element_line(color = "grey60", size = 0.2),
-              axis.text.x= element_blank(),
-              axis.text.y = element_text(size = 12, color = "black"),
-              axis.title.x = element_blank(),
-              axis.title.y = element_text(size = 16, face = "bold", color = "black"),
-              axis.ticks.x = element_blank(),
-              legend.position = "none",
-              strip.text = element_blank(),
-              strip.background = element_blank())
-      
-      p2_part1_3 <- ggplot(data = part1) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * plot_scale)) +
-        facet_wrap(~Side) +
-        scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
-        scale_y_continuous(limits = c(part1_min, part1_max), breaks = break_interval_2) +
-        coord_cartesian(ylim = c(part1_min, -plot_cut_point), xlim = c(-max(part1$POS_chr_mb)*0.01, max(part1$POS_chr_mb)*1.01), expand = F) +
-        labs(x = "Chromosomal position (Mb)",
-             y = "CCS") +
-        theme_bw() +
-        theme(plot.margin = margin(0.3,0,13,0, unit = "mm"),
-              panel.border = element_rect(color = "grey10", size = 0.5, fill = NA),
-              panel.grid.minor = element_blank(),
-              panel.grid.major = element_line(color = "grey60", size = 0.2),
-              axis.ticks.x = element_blank(),
-              axis.text.x = element_blank(),
-              axis.text.y = element_text(size = 12, color = "black"),
-              axis.title.x = element_blank(),
-              axis.title.y = element_blank(),
-              legend.position = "none",
-              strip.text = element_blank(),
-              strip.background = element_blank())
-  
-      part2 <- res[[2]] %>% filter(Side == "Maternal")
-      if (max(part2$continuity) < 1000) {
-        part2_max <- 1000
-        break_interval_1 <- c(100, 500)
-      } else {
-        part2_max <- max(part2$continuity)
-        break_interval_1 <- c(1000, round_any(x = part2_max, accuracy = 1000, f = floor))
-      }
-      
-      if (min(part2$continuity) > -1000) {
-        part2_min <- -1000
-        break_interval_2 <- c(-100, -500)
-      } else {
-        part2_min <- min(part2$continuity)
-        break_interval_2 <- c(-1000, round_any(x = part2_min, accuracy = 1000, f = ceiling))
-      }
-      
-      p2_part2_1 <- ggplot(data = part2) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * plot_scale)) +
-        facet_wrap(~Side) +
-        scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
-        scale_y_continuous(limits = c(part2_min, part2_max), breaks = break_interval_1) +
-        coord_cartesian(ylim = c(plot_cut_point, part2_max), xlim = c(-max(part2$POS_chr_mb)*0.01, max(part2$POS_chr_mb)*1.01), expand = F) +
-        labs(x = "Chromosomal position (Mb)",
-             y = "CCS") +
-        theme_bw() +
-        theme(plot.margin = margin(0.3,0,0.3,0, unit = "mm"),
-              panel.border = element_rect(color = "grey10", size = 0.5, fill = NA),
-              panel.grid.minor = element_blank(),
-              panel.grid.major = element_line(color = "grey60", size = 0.2),
-              axis.text.x= element_blank(),
-              axis.text.y = element_text(size = 12, color = "black"),
-              axis.title.x = element_blank(),
-              axis.title.y = element_blank(),
-              axis.ticks.x = element_blank(),
-              legend.position = "none",
-              strip.text = element_text(size = 16, color = "black"),
-              strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
-      
-      p2_part2_2 <- ggplot(data = part2) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * (1 - 2*plot_scale))) +
-        facet_wrap(~Side) +
-        scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
-        ylim(part2_min, part2_max) +
-        coord_cartesian(ylim = c(-plot_cut_point, plot_cut_point), xlim = c(-max(part2$POS_chr_mb)*0.01, max(part2$POS_chr_mb)*1.01), expand = F) +
-        labs(x = "Chromosomal position (Mb)",
-             y = "CCS") +
-        theme_bw() +
-        theme(plot.title = element_text(size = 20, face = "bold"),
-              plot.margin = margin(0.3,0,0.3,0, unit = "mm"),
-              panel.border = element_rect(color = "grey10", size = 0.5, fill = NA),
-              panel.grid.minor = element_blank(),
-              panel.grid.major = element_line(color = "grey60", size = 0.2),
-              axis.text.x= element_blank(),
-              axis.text.y = element_text(size = 12, color = "black"),
-              axis.title.x = element_blank(),
-              axis.title.y = element_text(size = 16, face = "bold", color = "black"),
-              axis.ticks.x = element_blank(),
-              legend.position = "none",
-              strip.text = element_blank(),
-              strip.background = element_blank())
-      
-      p2_part2_3 <- ggplot(data = part2) +
-        scattermore::geom_scattermore(aes(x = POS_chr_mb, y = continuity), pointsize = 0.6, color = "#C91959", pixels = c(plot_panel_width, plot_panel_height * plot_scale)) +
-        facet_wrap(~Side) +
-        scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
-        scale_y_continuous(limits = c(part2_min, part2_max), breaks = break_interval_2) +
-        coord_cartesian(ylim = c(part2_min, -plot_cut_point), xlim = c(-max(part2$POS_chr_mb)*0.01, max(part2$POS_chr_mb)*1.01), expand = F) +
-        labs(x = "Chromosomal position (Mb)",
-             y = "CCS") +
-        theme_bw() +
-        theme(plot.title = element_text(size = 20, face = "bold"),
-              plot.margin = margin(0.3,0,0.3,0, unit = "mm"),
-              panel.border = element_rect(color = "grey10", size = 0.5, fill = NA),
-              panel.grid.minor = element_blank(),
-              panel.grid.major = element_line(color = "grey60", size = 0.2),
+              legend.position = "right",
+              legend.title = element_text(size = 12, face = "bold", color = "black"),
+              legend.text = element_text(size = 10, color = "black"),
+              legend.margin = margin(0,0,0,0),
+              plot.margin = margin(0.3,0,0.3,0),
+              panel.background = element_blank(),
+              panel.border = element_rect(color = "grey10", size = 1, fill = NA),
+              panel.grid.major.x = element_line(color = "grey60", size = 0.2),
+              panel.grid.major.y = element_blank(),
+              panel.spacing.y = unit(2.2, "lines"),
               axis.text.x = element_text(size = 16, color = "black"),
-              axis.text.y = element_text(size = 12, color = "black"),
+              axis.text.y = element_blank(),
               axis.title.x = element_text(size = 20, face = "bold", color = "black"),
               axis.title.y = element_blank(),
-              legend.position = "none",
-              strip.text = element_blank(),
-              strip.background = element_blank())
-      
-      p2 <- list(list(p2_part1_1, p2_part1_2, p2_part1_3), list(p2_part2_1, p2_part2_2, p2_part2_3), plot_scale)
+              axis.ticks.y = element_blank(),
+              strip.text = element_text(size = 16, color = "black"),
+              strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
+
+      p2 <- list(p2)
     }
     return(p2)
   }
@@ -917,7 +807,7 @@ recview_server <- function(input, output, session) {
     p3 <- res[[3]] %>%
       select(-`Chromosomal position (Mb)`) %>%
       mutate(Offspring = offspring, Chromosome = chromosome) %>%
-      select(Offspring, Chromosome, `Scaffold & Orientation`, everything())
+      select(Offspring, Chromosome, Origin, `Scaffold & Orientation`, `Chromosomal position (bp)`, `Precision (bp)`)
     return(p3)
   }
 
@@ -942,16 +832,16 @@ recview_server <- function(input, output, session) {
 
     pat_max <- get("Density", res[[4]] %>% filter(Side == "Paternal")) %>% max()
     mat_max <- get("Density", res[[4]] %>% filter(Side == "Maternal")) %>% max()
-    range_upper <- max(pat_max, mat_max)
+    range_upper <- max(pat_max*1e5, mat_max*1e5)
 
     p4 <- ggplot(data = res[[4]]) +
-      geom_line(aes(x = POS_chr_mb, y = Density, group = Side), size = 0.2) +
+      geom_line(aes(x = POS_chr_mb, y = Density*1e5, group = Side), size = 0.2) +
       scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
       coord_cartesian(ylim = c(-range_upper*0.1, range_upper*1.1), xlim = c(-max(res[[4]]$POS_chr_mb)*0.01, max(res[[4]]$POS_chr_mb)*1.01), expand = F) +
       labs(x = "Chromosomal position (Mb)",
-           y = "Density (per 100 kb)",
+           y = expression(bold(atop("Density of", "informative SNPs" (''%*%"10"^"-5")))),
            title = paste0(offspring, '; Chr', chromosome)) +
-      facet_wrap(~Side, nrow = 2, strip.position = "top") +
+      facet_wrap(~Side, nrow = 2, strip.position = "right") +
       theme(plot.title = element_text(size = 20, face = "bold"),
             plot.margin = margin(5,10,0,0),
             panel.background = element_blank(),
@@ -963,16 +853,16 @@ recview_server <- function(input, output, session) {
             strip.text = element_text(size = 16, color = "black"),
             strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
 
-    if (location == "Yes") {
-      res3_plot <- res[[3]] %>% filter(`Chromosomal position (Mb)` != "-") %>%
-        `colnames<-`(.,c("Side", colnames(.)[-1]))
-      res3_plot$`Chromosomal position (Mb)` <- as.numeric(res3_plot$`Chromosomal position (Mb)`)
-      if (nrow(res3_plot) > 0) {
-        p4 <- p4 +
-          geom_point(data =res3_plot,
-                     aes(x = `Chromosomal position (Mb)`, y = 0), pch = 23, fill = "firebrick2", size = 2.3)
-      }
-    }
+    # if (location == "Yes") {
+    #   res3_plot <- res[[3]] %>% filter(`Chromosomal position (Mb)` != "-") %>%
+    #     `colnames<-`(.,c("Side", colnames(.)[-1]))
+    #   res3_plot$`Chromosomal position (Mb)` <- as.numeric(res3_plot$`Chromosomal position (Mb)`)
+    #   if (nrow(res3_plot) > 0) {
+    #     p4 <- p4 +
+    #       geom_point(data =res3_plot,
+    #                  aes(x = `Chromosomal position (Mb)`, y = 0), pch = 23, fill = "firebrick2", size = 2.3)
+    #   }
+    # }
 
     return(p4)
   }
@@ -1090,7 +980,7 @@ recview_server <- function(input, output, session) {
       table_filename <- paste0('Chromosome_', ch(), '_', alg(), '_RecPos_TimeStamp', stamp, '.csv')
 
       if (loc() == "Yes") {
-        hei_mod <- 13.5
+        hei_mod <- 15
         wid_mod <- 15
 
         if ("GoO Inferences" %in% sop2()) {
@@ -1099,40 +989,20 @@ recview_server <- function(input, output, session) {
 
         out_temp <- list()
         if ("Plots" %in% sop2()) {
-          if (length(rpe[[1]][[2]][[1]]) == 1) {
-            for (i in 1:length(rpe[[1]][[1]])) {
-              goo_legend <- ggpubr::get_legend(rpe[[1]][[1]][[i]])
-              out_temp[[i]] <- ggpubr::ggarrange(plotlist =  list(rpe[[1]][[1]][[i]] + theme(legend.position = "none"), 
-                                                                  NULL,
-                                                                  rpe[[1]][[2]][[i]][[1]] + theme(plot.title = element_blank()),
-                                                                  NULL,
-                                                                  rpe[[1]][[4]][[i]] + theme(plot.title = element_blank())), ncol = 1, heights = c(1.2,0.08,1.4,0.08,1), align = "v")
-              
-              out_temp[[i]] <- ggpubr::ggarrange(out_temp[[i]], 
-                                                 ggpubr::ggarrange(goo_legend, NULL, NULL, ncol = 1), 
-                                                 ncol = 2, widths = c(10,1))
-            }
-          } else {
-            for (i in 1:length(rpe[[1]][[1]])) {
-              plot_scale <- rpe[[1]][[2]][[i]][[3]]
-              plot_scale_vector <- c(plot_scale, 1 - 2*plot_scale, plot_scale) * 0.7
-              goo_legend <- ggpubr::get_legend(rpe[[1]][[1]][[i]])
-              out_temp[[i]] <- ggpubr::ggarrange(plotlist =  list(rpe[[1]][[1]][[i]] + theme(legend.position = "none"),
-                                                                  NULL,
-                                                                  rpe[[1]][[2]][[i]][[1]][[1]] + theme(plot.title = element_blank()),
-                                                                  rpe[[1]][[2]][[i]][[1]][[2]],
-                                                                  rpe[[1]][[2]][[i]][[1]][[3]],
-                                                                  rpe[[1]][[2]][[i]][[2]][[1]],
-                                                                  rpe[[1]][[2]][[i]][[2]][[2]],
-                                                                  rpe[[1]][[2]][[i]][[2]][[3]],
-                                                                  NULL,
-                                                                  rpe[[1]][[4]][[i]] + theme(plot.title = element_blank())), ncol = 1, heights = c(1.2,0.08,plot_scale_vector, plot_scale_vector,0.08,1), align = "v")
-              
-              out_temp[[i]] <- ggpubr::ggarrange(out_temp[[i]], 
-                                                 ggpubr::ggarrange(goo_legend, NULL, NULL, ncol = 1), 
-                                                 ncol = 2, widths = c(10,1))
-            }
+          for (i in 1:length(rpe[[1]][[1]])) {
+            goo_legend_1 <- ggpubr::get_legend(rpe[[1]][[1]][[i]])
+            goo_legend_2 <- ggpubr::get_legend(rpe[[1]][[2]][[i]])
+            out_temp[[i]] <- ggpubr::ggarrange(plotlist =  list(rpe[[1]][[1]][[i]] + theme(plot.title = element_text(size = 36, face = "bold"), legend.position = "none"), 
+                                                                NULL,
+                                                                rpe[[1]][[2]][[i]][[1]] + theme(plot.title = element_blank(), legend.position = "none"),
+                                                                NULL,
+                                                                rpe[[1]][[4]][[i]] + theme(plot.title = element_blank())), ncol = 1, heights = c(1.1,0.1,1.1,0.1,1), align = "v")
+            
+            out_temp[[i]] <- ggpubr::ggarrange(out_temp[[i]], 
+                                               ggpubr::ggarrange(goo_legend_1, goo_legend_2, NULL, ncol = 1), 
+                                               ncol = 2, widths = c(10,1))
           }
+          
           ggpubr::ggexport(plotlist = out_temp, filename = plot_filename, verbose = FALSE, width = wid_mod, height = hei_mod)
         }
 
@@ -1160,12 +1030,17 @@ recview_server <- function(input, output, session) {
       }
     } else {
       for (i in 1:length(rpe)) {
-        inference_filename <- paste0('Chromosome_', names(rpe)[i], '_GoO.csv')
-        plot_filename <- paste0('Chromosome_', names(rpe)[i], '.pdf')
-        table_filename <- paste0('Chromosome_', names(rpe)[i], '.csv')
+        stamp <- format(Sys.time(), "%m%d%H%M")
+        inference_filename <- paste0('Chromosome_', names(rpe)[i], '_GoO_TimeStamp', stamp, '.csv')
+        if (loc() == "Yes") {
+          plot_filename <- paste0('Chromosome_', names(rpe)[i], '_', alg(), '_TimeStamp', stamp, '.pdf')
+        } else {
+          plot_filename <- paste0('Chromosome_', names(rpe)[i], '_TimeStamp', stamp, '.pdf')
+        }
+        table_filename <- paste0('Chromosome_', names(rpe)[i], '_', alg(), '_RecPos_TimeStamp', stamp, '.csv')
 
         if (loc() == "Yes") {
-          hei_mod <- 13.5
+          hei_mod <- 15
           wid_mod <- 15
 
           if ("GoO Inferences" %in% sop2()) {
@@ -1174,40 +1049,20 @@ recview_server <- function(input, output, session) {
 
           out_temp <- list()
           if ("Plots" %in% sop2()) {
-            if (length(rpe[[i]][[2]][[1]]) == 1) {
-              for (j in 1:length(rpe[[i]][[1]])) {
-                goo_legend <- ggpubr::get_legend(rpe[[i]][[1]][[j]])
-                out_temp[[j]] <- ggpubr::ggarrange(plotlist =  list(rpe[[i]][[1]][[j]] + theme(legend.position = "none"), 
-                                                                    NULL,
-                                                                    rpe[[i]][[2]][[j]][[1]] + theme(plot.title = element_blank()), 
-                                                                    NULL,
-                                                                    rpe[[i]][[4]][[j]] + theme(plot.title = element_blank())), ncol = 1, heights = c(1.2,0.08,1.4,0.08,1), align = "v")
-                
-                out_temp[[j]] <- ggpubr::ggarrange(out_temp[[j]], 
-                                                   ggpubr::ggarrange(goo_legend, NULL, NULL, ncol = 1), 
-                                                   ncol = 2, widths = c(10,1))
-              }
-            } else {
-              for (j in 1:length(rpe[[i]][[1]])) {
-                plot_scale <- rpe[[i]][[2]][[j]][[3]]
-                plot_scale_vector <- c(plot_scale, 1 - 2*plot_scale, plot_scale) * 0.7
-                goo_legend <- ggpubr::get_legend(rpe[[i]][[1]][[j]])
-                out_temp[[j]] <- ggpubr::ggarrange(plotlist =  list(rpe[[i]][[1]][[j]] + theme(legend.position = "none"), 
-                                                                    NULL,
-                                                                    rpe[[i]][[2]][[j]][[1]][[1]] + theme(plot.title = element_blank()),
-                                                                    rpe[[i]][[2]][[j]][[1]][[2]],
-                                                                    rpe[[i]][[2]][[j]][[1]][[3]],
-                                                                    rpe[[i]][[2]][[j]][[2]][[1]], 
-                                                                    rpe[[i]][[2]][[j]][[2]][[2]],
-                                                                    rpe[[i]][[2]][[j]][[2]][[3]],
-                                                                    NULL,
-                                                                    rpe[[i]][[4]][[j]] + theme(plot.title = element_blank())), ncol = 1, heights = c(1.2,0.08,plot_scale_vector,plot_scale_vector,0.08,1), align = "v")
-                
-                out_temp[[j]] <- ggpubr::ggarrange(out_temp[[j]], 
-                                                   ggpubr::ggarrange(goo_legend, NULL, NULL, ncol = 1), 
-                                                   ncol = 2, widths = c(10,1))
-              }
+            for (j in 1:length(rpe[[i]][[1]])) {
+              goo_legend_1 <- ggpubr::get_legend(rpe[[i]][[1]][[j]])
+              goo_legend_2 <- ggpubr::get_legend(rpe[[i]][[2]][[j]])
+              out_temp[[j]] <- ggpubr::ggarrange(plotlist =  list(rpe[[i]][[1]][[j]] + theme(plot.title = element_text(size = 36, face = "bold"), legend.position = "none"), 
+                                                                  NULL,
+                                                                  rpe[[i]][[2]][[j]][[1]] + theme(plot.title = element_blank(), legend.position = "none"), 
+                                                                  NULL,
+                                                                  rpe[[i]][[4]][[j]] + theme(plot.title = element_blank())), ncol = 1, heights = c(1.1,0.1,1.1,0.1,1), align = "v")
+              
+              out_temp[[j]] <- ggpubr::ggarrange(out_temp[[j]], 
+                                                 ggpubr::ggarrange(goo_legend_1, goo_legend_2, NULL, ncol = 1), 
+                                                 ncol = 2, widths = c(10,1))
             }
+              
             ggpubr::ggexport(plotlist = out_temp, filename = plot_filename, verbose = FALSE, width = wid_mod, height = hei_mod)
           }
 
