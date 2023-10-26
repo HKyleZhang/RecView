@@ -273,7 +273,7 @@ recview_server <- function(input, output, session) {
             if (abs(p_1 - p_2) >= finer_threshold) {
               finer <- "yes"
               if (cp == 0) {
-                if (cut_point > radius) {
+                if ((cut_point - step) > radius) {
                   cp <- cut_point - step + finer_step
                   out <- out[1:(nrow(out) - 1),]
                 } else {
@@ -837,7 +837,7 @@ recview_server <- function(input, output, session) {
     p4 <- ggplot(data = res[[4]]) +
       geom_line(aes(x = POS_chr_mb, y = Density*1e5, group = Side), size = 0.2) +
       scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
-      coord_cartesian(ylim = c(-range_upper*0.1, range_upper*1.1), xlim = c(-max(res[[4]]$POS_chr_mb)*0.01, max(res[[4]]$POS_chr_mb)*1.01), expand = F) +
+      coord_cartesian(ylim = c(-range_upper*0.1, range_upper*1.1), xlim = c(-max(res[[1]]$POS_chr_mb)*0.01, max(res[[1]]$POS_chr_mb)*1.01), expand = F) +
       labs(x = "Chromosomal position (Mb)",
            y = expression(bold(atop("Density of", "informative SNPs" (''%*%"10"^"-5")))),
            title = paste0(offspring, '; Chr', chromosome)) +
