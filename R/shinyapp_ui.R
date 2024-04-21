@@ -4,7 +4,7 @@
 recview_ui <- function(request) {
   fluidPage(
     shinyjs::useShinyjs(),
-    h6("version 1.0.1"),
+    h6("version 1.0.0"),
     imageOutput("title", height = "70px", width = "383px"),
     h5("Maintainer: Hongkai Zhang"),
     sidebarPanel(width = 3,
