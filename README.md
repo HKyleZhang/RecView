@@ -108,10 +108,6 @@ For big VCF file, it is recommended to continue with **Workflow A**.
 
 ## Please cite:
 
-Zhang H, Hansson B. RecView: an interactive R application for viewing and locating recombination positions using pedigree data. BioRxiv 2022:2022.12.21.521365. <doi:10.1101/2022.12.21.521365>.
+Zhang, H., Hansson, B. RecView: an interactive R application for locating recombination positions using pedigree data. BMC Genomics 24, 712 (2023). <https://doi.org/10.1186/s12864-023-09807-2>.
 
 <br>
-
-## Version history
-
--   version 1.0.0: Dec, 2022
