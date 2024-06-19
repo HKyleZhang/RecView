@@ -30,7 +30,7 @@ make_012gt_from_vcf <- function(vcf, limit = 1.5e9, F0F1_rename = "no_rename", s
     out <- out %>% mutate(!!col_names[i] := (left + right))
   }
 
-  if ((F0F1_rename != "no_rename") && (length(F0F1_rename) == 6)) {
+  if (length(F0F1_rename) == 6) {
     out_new <- out %>%
       select(-F0F1_rename) %>%
       mutate(A = get(F0F1_rename[1], out),

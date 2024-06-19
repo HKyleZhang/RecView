@@ -23,7 +23,7 @@ make_012gt <- function(gt, F0F1_rename = "no_rename", save_filename = "gt_012.cs
     out <- out %>% mutate(!!col_names[i] := (left + right))
   }
 
-  if ((F0F1_rename != "no_rename") && (length(F0F1_rename) == 6)) {
+  if (length(F0F1_rename) == 6) {
     out_new <- out %>%
       select(-F0F1_rename) %>%
       mutate(A = get(F0F1_rename[1], out),
