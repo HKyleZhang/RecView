@@ -52,6 +52,23 @@ recview_server <- function(input, output, session) {
     }
   })
   
+  ### Show the result of which chromosome droplist ----
+  output$show_chr <- renderUI({
+    if(!is.null(input$scfile)) {
+      all_chr <- read_csv(input$scfile$datapath, col_types = cols(CHR = col_character())) %>% 
+        .$CHR %>% 
+        str_sort(numeric = T) %>% 
+        unique()
+      selectInput(inputId = "show_chr", 
+                  label = "Show results of chromosome:", 
+                  multiple = FALSE,
+                  choices = names(rec_plot_event()),
+                  width = "100%",
+                  selectize = FALSE)
+    }
+  })
+  
+  
   ## 2.1 Read-in and Settings ----
   ### Read-in data file ----
   dd <- reactive({
@@ -143,6 +160,10 @@ recview_server <- function(input, output, session) {
   })
   sop2 <- reactive({
       input$save_opt2
+  })
+  ### Chromosome visualisation setting ----
+  show_ch <- reactive({
+    req(input$show_chr)
   })
 
 
@@ -867,12 +888,6 @@ recview_server <- function(input, output, session) {
     return(p4)
   }
 
-  msg_plot <- function() {
-    p <- ggpubr::ggparagraph(text = "\nPlots are not shown with multiple chromosomes setting. \nPlease consider to use the saving options.",
-                             size = 16, face = "italic")
-    return(p)
-  }
-
   ### 2.2.3 Conduct analysis ----
   rec_plot_event <- eventReactive(input$click, {
     if (!isFALSE(dd()) && !isFALSE(sc()) && ch() != '') {
@@ -962,8 +977,9 @@ recview_server <- function(input, output, session) {
     }
   })
 
+  
   #<<< Output to User Interface >>>#
-  observeEvent(input$click, {
+  observeEvent(c(show_ch(), input$click), {
     num_off <- length(of())
     hei <- num_off * 450
 
@@ -1092,35 +1108,32 @@ recview_server <- function(input, output, session) {
     }
 
     recfig <- list()
-    if (length(rpe) == 1) {
-      if (length(rpe[[1]]) == 3) {
-        recfig[[1]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[1]][[1]], ncol = 1, align = "v")}, height = hei * 0.9)
-        recfig[[2]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[1]][[2]], ncol = 1, align = "v")}, height = hei * 0.9)
-      } else if (length(rpe[[1]]) > 3) {
-        if (length(rpe[[1]][[2]][[1]]) == 1) {
-          for (i in 1:length(rpe[[1]][[2]])) {
-            rpe[[1]][[2]][[i]] <- ggpubr::ggarrange(plotlist =  rpe[[1]][[2]][[i]], ncol = 1)
-          }
-        } else {
-          for (i in 1:length(rpe[[1]][[2]])) {
-            plot_scale <- rpe[[1]][[2]][[i]][[3]]
-            part1 <- ggpubr::ggarrange(plotlist = rpe[[1]][[2]][[i]][[1]], ncol = 1, align = "v", heights = c(plot_scale + 0.02, 1 - 2*plot_scale - 0.02, plot_scale))
-            part2 <- ggpubr::ggarrange(plotlist = rpe[[1]][[2]][[i]][[2]], ncol = 1, align = "v", heights = c(plot_scale + 0.02, 1 - 2*plot_scale - 0.02, plot_scale))
-            rpe[[1]][[2]][[i]] <- ggpubr::ggarrange(part1, part2, ncol = 1)
-          }
+    show_chr_in <- show_ch()
+    if (length(rpe[[show_chr_in]]) == 3) {
+      recfig[[1]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[show_chr_in]][[1]], ncol = 1, align = "v")}, height = hei * 0.9)
+      recfig[[2]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[show_chr_in]][[2]], ncol = 1, align = "v")}, height = hei * 0.9)
+    } else if (length(rpe[[show_chr_in]]) > 3) {
+      if (length(rpe[[show_chr_in]][[2]][[1]]) == 1) {
+        for (i in 1:length(rpe[[show_chr_in]][[2]])) {
+          rpe[[show_chr_in]][[2]][[i]] <- ggpubr::ggarrange(plotlist =  rpe[[show_chr_in]][[2]][[i]], ncol = 1)
         }
-        recfig[[1]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[1]][[1]], ncol = 1, align = "v")}, height = hei * 0.9)
-        recfig[[2]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[1]][[2]], ncol = 1, align = "v")}, height = hei)
-        recfig[[3]] <- DT::renderDataTable(reduce(rpe[[1]][[3]], rbind),
-                                           options = list(
-                                             pageLength = 25,
-                                             searchHighlight = TRUE
-                                           ),
-                                           filter = 'top')
-        recfig[[4]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[1]][[4]], ncol = 1, align = "v")}, height = hei * 0.9)
+      } else {
+        for (i in 1:length(rpe[[show_chr_in]][[2]])) {
+          plot_scale <- rpe[[show_chr_in]][[2]][[i]][[3]]
+          part1 <- ggpubr::ggarrange(plotlist = rpe[[show_chr_in]][[2]][[i]][[1]], ncol = 1, align = "v", heights = c(plot_scale + 0.02, 1 - 2*plot_scale - 0.02, plot_scale))
+          part2 <- ggpubr::ggarrange(plotlist = rpe[[show_chr_in]][[2]][[i]][[2]], ncol = 1, align = "v", heights = c(plot_scale + 0.02, 1 - 2*plot_scale - 0.02, plot_scale))
+          rpe[[show_chr_in]][[2]][[i]] <- ggpubr::ggarrange(part1, part2, ncol = 1)
+        }
       }
-    } else {
-      recfig[[1]] <- renderPlot({msg_plot()})
+      recfig[[1]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[show_chr_in]][[1]], ncol = 1, align = "v")}, height = hei * 0.9)
+      recfig[[2]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[show_chr_in]][[2]], ncol = 1, align = "v")}, height = hei)
+      recfig[[3]] <- DT::renderDataTable(reduce(rpe[[show_chr_in]][[3]], rbind),
+                                         options = list(
+                                           pageLength = 25,
+                                           searchHighlight = TRUE
+                                         ),
+                                         filter = 'top')
+      recfig[[4]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[show_chr_in]][[4]], ncol = 1, align = "v")}, height = hei * 0.9)
     }
 
     output$ui_out <- renderUI({
