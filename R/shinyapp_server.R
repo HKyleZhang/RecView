@@ -890,7 +890,7 @@ recview_server <- function(input, output, session) {
 
   ### 2.2.3 Conduct analysis ----
   rec_plot_event <- eventReactive(input$click, {
-    if (!isFALSE(dd()) && !isFALSE(sc()) && ch() != '') {
+    if (!isFALSE(dd()) && !isFALSE(sc()) && length(ch()) > 0) {
 
       progress <- shiny::Progress$new()
       on.exit(progress$close())
