@@ -57,6 +57,10 @@ recview_ui <- function(request) {
     mainPanel(width = 9,
       conditionalPanel(
         condition = "input.click > 0",
+        uiOutput(outputId = "show_chr")),
+      
+      conditionalPanel(
+        condition = "input.click > 0",
         uiOutput(outputId = "ui_out") %>% shinycssloaders::withSpinner(color="#008AA4", type = 6, size = 1.8)
       )
     )
