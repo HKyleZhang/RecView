@@ -927,7 +927,7 @@ recview_server <- function(input, output, session) {
 
       p_list_list <- list()
       for (i in 1:length(ch_in)) {
-        res_list <- foreach(j = 1:length(offspring)) %dopar% {
+        res_list <- foreach(j = 1:length(offspring), .export = "rec_analyse") %dopar% {
           rec_analyse(data = dd_in, sc_order = sc_in, chromosome = ch_in[i], offspring = offspring[j],
                       loc = loc_in, alg = alg_in, thrsd = thrsd_in,
                       radius = rad_in, step = stp_in, finer_step = fstp_in, finer_threshold = fthrsd_in)
