@@ -159,19 +159,6 @@ recview_server <- function(input, output, session) {
     } else if (chromosome == "X") {
       dictionary <- dictionary %>% filter(Chromosome_type == "X")
     }
-
-    AB_line <- c("Yes", "Yes", "Yes")
-    CD_line <- c("Yes", "Yes", "Yes")
-    case <- 0
-    if (!("A" %in% colnames(data))) AB_line[1] <- "No"
-    if (!("B" %in% colnames(data))) AB_line[2] <- "No"
-    if (!("AB" %in% colnames(data))) AB_line[3] <- "No"
-    if (!("C" %in% colnames(data))) CD_line[1] <- "No"
-    if (!("D" %in% colnames(data))) CD_line[2] <- "No"
-    if (!("CD" %in% colnames(data))) CD_line[3] <- "No"
-
-    if ("No" %in% AB_line) case <- 1
-    if ("No" %in% CD_line) case <- 2
     
     dd_ind <- data %>%
       select(id, CHROM, POS,
@@ -228,6 +215,10 @@ recview_server <- function(input, output, session) {
       filter(Grandparent_of_origin != "N") %>%
       mutate(Grandparent_of_origin_value = NaN, Side = "Maternal")
 
+    case <- 0
+    if (nrow(res_par) == 0) case <- 1
+    if (nrow(res_mar) == 0) case <- 2
+    
     res <- list()
     res[[1]] <- bind_rows(res_par, res_mar) %>%
       mutate(Grandparent_of_origin_value = if_else(Grandparent_of_origin == "D", 0, Grandparent_of_origin_value),
