@@ -263,95 +263,123 @@ recview_server <- function(input, output, session) {
     #### Automatic detection of recombination location ----
     if (loc == "Yes") {
       if (alg == "PD") {
-        goo_proportion <- function(tb, side, symbol) {
+        seqle_mod <- function(x) {
+          n <- length(x)  
+          y <- x[-1L] != x[-n] + 1
+          i <- c(which(y|is.na(y)),n) 
+          return(x[head(c(0L,i)+1L,-1L)])
+        }
+        
+        find_local_maxima <- function(tb) {
+          tb[which(tb$diff == max(tb$diff)),]
+        }
+
+        goo_proportion <- function(input, tb, side, symbol) {
+          tb <- tb[input$seg_start[1]:input$seg_end[1],]
           n <- tb %>% filter(get(side, tb) == !!symbol) %>% nrow()
           frequency <- n / nrow(tb)
           return(frequency)
         }
-
+        
+        finer_running_difference <- function(input, goo_proportion_diff_tb, tb, side, symbol, radius, finer_step, finer_threshold) {
+          i <- input$row_start[1]
+          while (goo_proportion_diff_tb$diff[i] >= finer_threshold) {
+            i <- i + 1
+          }
+          cut_point <- seq(goo_proportion_diff_tb$cut_point[input$row_start[1]] + finer_step, goo_proportion_diff_tb$cut_point[i] - finer_step, finer_step)
+          seg_1_proportion <- tibble(cut_point = cut_point, seg_start = cut_point - radius + 1, seg_end = cut_point) %>% 
+            nest(input = !cut_point) %>% 
+            mutate(p_1 = map(input, goo_proportion, tb, side, symbol)) %>% 
+            unnest(cols = c("input", "p_1"))
+          seg_2_proportion <- tibble(cut_point = cut_point, seg_start = cut_point, seg_end = cut_point + radius) %>% 
+            nest(input = !cut_point) %>% 
+            mutate(p_2 = map(input, goo_proportion, tb, side, symbol)) %>% 
+            unnest(cols = c("input", "p_2"))
+          out <- inner_join(seg_1_proportion, seg_2_proportion, by = "cut_point") %>% 
+            mutate(diff = abs(p_1 - p_2))
+          return(out)
+        }
+        
         running_difference <- function(tb, radius, step, finer_step = 1, finer_threshold = 0.95, side, symbol) {
           snp <- nrow(tb)
-          out <- tibble(POS_chr = as.numeric(), p_1 = as.numeric(), p_2 = as.numeric(), diff = as.numeric())
-
-          cut_point <- radius + 1
-          finer <- "no"
-          cp <- 0
-          while ((cut_point <= (snp - radius)) && (cp <= (snp - radius))) {
-            if (finer == "no") {
-              seg_1 <- tb[(cut_point-radius):(cut_point-1),]
-              seg_2 <- tb[cut_point:(cut_point+radius-1),]
-              index <- cut_point
-            } else if (finer == "yes") {
-              seg_1 <- tb[(cp-radius):(cp-1),]
-              seg_2 <- tb[cp:(cp+radius-1),]
-              index <- cp
-            }
-
-            p_1 <- goo_proportion(seg_1, side = side, symbol = symbol)
-            p_2 <- goo_proportion(seg_2, side = side, symbol = symbol)
-            out <- out %>% add_row(POS_chr = tb$POS_chr[index], p_1 = p_1, p_2 = p_2, diff = abs(p_1 - p_2))
-
-            if (abs(p_1 - p_2) >= finer_threshold) {
-              finer <- "yes"
-              if (cp == 0) {
-                if ((cut_point - step) > radius) {
-                  cp <- cut_point - step + finer_step
-                  out <- out[1:(nrow(out) - 1),]
-                } else {
-                  cp <- cut_point + finer_step
-                }
-              } else {
-                cp <- cp + finer_step
-              }
-            } else {
-              finer <- "no"
-              if (cp != 0) {
-                cut_point <- cp
-              }
-              cp <- 0
-              cut_point <- cut_point + step
-            }
+          cut_point <- seq(1, snp - radius * 2, step) + radius - 1
+          seg_1_proportion <- tibble(cut_point = cut_point, seg_start = cut_point - radius + 1, seg_end = cut_point) %>% 
+            nest(input = !cut_point) %>% 
+            mutate(p_1 = map(input, goo_proportion, tb, side, symbol)) %>% 
+            unnest(cols = c("input", "p_1"))
+          seg_2_proportion <- tibble(cut_point = cut_point, seg_start = cut_point, seg_end = cut_point + radius) %>% 
+            nest(input = !cut_point) %>% 
+            mutate(p_2 = map(input, goo_proportion, tb, side, symbol)) %>% 
+            unnest(cols = c("input", "p_2"))
+          segment_goo_proportion_diff <- inner_join(seg_1_proportion, seg_2_proportion, by = "cut_point") %>% 
+            mutate(diff = abs(p_1 - p_2))
+          
+          rows_above_thrshd <- seqle_mod(which(segment_goo_proportion_diff$diff >= finer_threshold))
+          if (!is.na(rows_above_thrshd)) {
+            segment_goo_proportion_finer <- tibble(row_start = rows_above_thrshd) %>% 
+              mutate(id = seq(1, nrow(.))) %>% 
+              nest(input = !id) %>% 
+              mutate(output = map(input, finer_running_difference, segment_goo_proportion_diff, tb, side, symbol, radius, finer_step, finer_threshold)) %>% 
+              mutate(local_maxima = map(output, find_local_maxima)) %>% 
+              select(output, local_maxima)
+          } else {
+            segment_goo_proportion_finer <- tibble(output = tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric()),
+                                                  local_maxima = tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric()))
           }
+          
+          out <- list(segment_goo_proportion_diff, segment_goo_proportion_finer)
           return(out)
         }
 
         dd_pat <- res_raw %>% filter(Paternal != "N")
         dd_mat <- res_raw %>% filter(Maternal != "N")
 
-        dd_pat_mod <- running_difference(tb = dd_pat, radius = radius, step = step, finer_step = finer_step, finer_threshold = finer_threshold, side = "Paternal", symbol = "A") %>%
-          mutate(Side = "Paternal")
-        dd_mat_mod <- running_difference(tb = dd_mat, radius = radius, step = step, finer_step = finer_step, finer_threshold = finer_threshold, side = "Maternal", symbol = "C") %>%
-          mutate(Side = "Maternal")
+        if (nrow(dd_pat) > 0) {
+          dd_pat_mod <- running_difference(tb = dd_pat, radius = radius, step = step, finer_step = finer_step, finer_threshold = finer_threshold, side = "Paternal", symbol = "A")
+        } else {
+          dd_pat_mod <- list()
+          dd_pat_mod[[1]] <- tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric())
+          dd_pat_mod[[2]] <- tibble(output = tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric()))
+        }
+        if (nrow(dd_mat) > 0) {
+          dd_mat_mod <- running_difference(tb = dd_mat, radius = radius, step = step, finer_step = finer_step, finer_threshold = finer_threshold, side = "Maternal", symbol = "C")
+        } else {
+          dd_mat_mod <- list()
+          dd_mat_mod[[1]] <- tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric())
+          dd_mat_mod[[2]] <- tibble(output = tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric()))
+        }
+        
+        dd_pat_mod_ <- bind_rows(dd_pat_mod[[1]], dd_pat_mod[[2]] %>% select(output) %>% unnest(cols = "output")) %>% 
+          mutate(Side = "Paternal", POS_chr = dd_pat$POS_chr[.$cut_point])
+        dd_mat_mod_ <- bind_rows(dd_mat_mod[[1]], dd_mat_mod[[2]] %>% select(output) %>% unnest(cols = "output")) %>% 
+          mutate(Side = "Maternal", POS_chr = dd_mat$POS_chr[.$cut_point])
 
-        res[[2]] <- bind_rows(dd_pat_mod, dd_mat_mod) %>%
+        res[[2]] <- bind_rows(dd_pat_mod_, dd_mat_mod_) %>% 
+          distinct(Side, POS_chr, diff) %>% 
           mutate(POS_chr_mb = POS_chr/1e6)
         res[[2]]$Side <- factor(res[[2]]$Side, levels = c("Paternal", "Maternal"))
-
-        res[[3]] <- res[[2]] %>%
-          filter(ggpmisc:::find_peaks(res[[2]]$diff, ignore_threshold = finer_threshold - 0.1, span = 21, strict = TRUE)) %>%
-          filter(diff >= finer_threshold - 0.1) %>%
-          select(Side, POS_chr, POS_chr_mb, diff)
-
-        if (nrow(res[[3]]) != 0) {
-          res_row_before <- nrow(res[[3]])
-          res_row_after <- 0
-          span_value <- 23
-          while (res_row_after != res_row_before) {
-            res_row_before <- nrow(res[[3]])
-            res[[3]] <- res[[2]] %>%
-              filter(ggpmisc:::find_peaks(res[[2]]$diff, ignore_threshold = finer_threshold - 0.1, span = span_value, strict = TRUE)) %>%
-              filter(diff >= finer_threshold - 0.1) %>%
-              select(Side, POS_chr, POS_chr_mb, diff)
-            res_row_after <- nrow(res[[3]])
-            span_value <- span_value + 2
-          }
-          res[[3]]$diff <- round(res[[3]]$diff, digits = 5)
-        } else {
+        
+        dd_pat_mod_local_maxima <- dd_pat_mod[[2]] %>% 
+          select(local_maxima) %>% 
+          unnest(cols = "local_maxima") %>% 
+          mutate(Side = "Paternal", POS_chr = dd_pat$POS_chr[.$cut_point])
+        dd_mat_mod_local_maxima <- dd_mat_mod[[2]] %>% 
+          select(local_maxima) %>% 
+          unnest(cols = "local_maxima") %>% 
+          mutate(Side = "Maternal", POS_chr = dd_mat$POS_chr[.$cut_point])
+        
+        res[[3]] <- rbind(dd_pat_mod_local_maxima, dd_mat_mod_local_maxima) %>%
+          distinct(Side, POS_chr, diff) %>% 
+          mutate(POS_chr_mb = POS_chr/1e6)
+        res[[3]]$Side <- factor(res[[3]]$Side, levels = c("Paternal", "Maternal"))
+        
+        if (nrow(res[[3]]) == 0) {
           res[[3]] <- tibble(Side = c("Paternal", "Maternal"),
                              POS_chr = c("-", "-"),
                              POS_chr_mb = c("-", "-"),
                              diff = c("-", "-"))
         }
+
         res1_mod <- res[[1]] %>% select(POS_chr, scaffold_orientation)
         res1_mod$POS_chr <- as.character(res1_mod$POS_chr)
         res1_mod$scaffold_orientation <- as.character(res1_mod$scaffold_orientation)
