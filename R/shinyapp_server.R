@@ -314,8 +314,9 @@ recview_server <- function(input, output, session) {
           segment_goo_proportion_diff <- inner_join(seg_1_proportion, seg_2_proportion, by = "cut_point") %>% 
             mutate(diff = abs(p_1 - p_2))
           
-          rows_above_thrshd <- seqle_mod(which(segment_goo_proportion_diff$diff >= finer_threshold))
-          if (!is.na(rows_above_thrshd)) {
+          rows_above_thrshd <- seqle_mod(which(segment_goo_proportion_diff$diff >= finer_threshold)) %>% 
+            discard(is.na)
+          if (length(rows_above_thrshd) > 0) {
             segment_goo_proportion_finer <- tibble(row_start = rows_above_thrshd) %>% 
               mutate(id = seq(1, nrow(.))) %>% 
               nest(input = !id) %>% 
@@ -1166,26 +1167,28 @@ recview_server <- function(input, output, session) {
 
     output$ui_out <- renderUI({
       nTabs <- length(recfig)
-      if (nTabs == 1) {
-        output$plot1 <- recfig[[1]]
-        tablist <- list(tabPanel(title = "Message", plotOutput("plot1", height = paste0(hei,'px'))))
-      } else if (nTabs == 2) {
-        output$plot1 <- recfig[[1]]
-        output$plot2 <- recfig[[2]]
-        tablist <- list(tabPanel(title = "GoO inference", plotOutput("plot1", height = paste0(hei,'px'))),
-                        tabPanel(title = "Density", plotOutput("plot2", height = paste0(hei,'px'))))
-      } else if (nTabs > 2) {
-        output$plot1 <- recfig[[1]]
-        output$plot2 <- recfig[[2]]
-        output$plot3 <- recfig[[3]]
-        output$plot4 <- recfig[[4]]
-        tablist <- list(tabPanel(title = "GoO inference", plotOutput("plot1", height = paste0(hei,'px'))),
-                        tabPanel(title = "Location inference", plotOutput("plot2", height = paste0(hei,'px'))),
-                        tabPanel(title = "Location table", DT::DTOutput("plot3", height = '450px')),
-                        tabPanel(title = "Density", plotOutput("plot4", height = paste0(hei,'px')))
-                        )
+      if (nTabs != 0) {
+        if (nTabs == 1) {
+          output$plot1 <- recfig[[1]]
+          tablist <- list(tabPanel(title = "Message", plotOutput("plot1", height = paste0(hei,'px'))))
+        } else if (nTabs == 2) {
+          output$plot1 <- recfig[[1]]
+          output$plot2 <- recfig[[2]]
+          tablist <- list(tabPanel(title = "GoO inference", plotOutput("plot1", height = paste0(hei,'px'))),
+                          tabPanel(title = "Density", plotOutput("plot2", height = paste0(hei,'px'))))
+        } else if (nTabs > 2) {
+          output$plot1 <- recfig[[1]]
+          output$plot2 <- recfig[[2]]
+          output$plot3 <- recfig[[3]]
+          output$plot4 <- recfig[[4]]
+          tablist <- list(tabPanel(title = "GoO inference", plotOutput("plot1", height = paste0(hei,'px'))),
+                          tabPanel(title = "Location inference", plotOutput("plot2", height = paste0(hei,'px'))),
+                          tabPanel(title = "Location table", DT::DTOutput("plot3", height = '450px')),
+                          tabPanel(title = "Density", plotOutput("plot4", height = paste0(hei,'px')))
+                          )
+        }
+        do.call(tabsetPanel, tablist)
       }
-      do.call(tabsetPanel, tablist)
     })
   })
 }
