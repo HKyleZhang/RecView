@@ -171,8 +171,8 @@ recview_server <- function(input, output, session) {
   ### 2.2.1 Function to analyse recombination locations ----
   rec_analyse <- function(data, sc_order, chromosome, offspring, loc, alg, thrsd, radius, step, finer_step, finer_threshold) {
     dt_path <- system.file("dictionary", package = "RecView")
-    dictionary <- read_tsv(file = list.files(path = dt_path, pattern = "dict_complete.tsv", full.names = T),
-                           col_types = cols())
+    dictionary <- read_tsv(file = list.files(path = dt_path, pattern = "dict_complete.tsv", full.names = T), col_types = cols()) %>% 
+      filter(!(Paternal == "N" & Maternal == "N"))
     if ((chromosome != "Z") && (chromosome != "X")) {
       dictionary <- dictionary %>% filter(Chromosome_type != "Z", Chromosome_type != "X")
     } else if (chromosome == "Z") {
@@ -194,9 +194,9 @@ recview_server <- function(input, output, session) {
     if ("No" %in% AB_line) case <- 1
     if ("No" %in% CD_line) case <- 2
     
-    goo_inference <- function(tb, offspring, dictionary) {
+    goo_inference <- function(tb, dictionary) {
       goo <- dictionary %>% 
-        filter(A == tb$A[1], B == tb$B[1], C == tb$C[1], D == tb$D[1], AB == tb$AB[1], CD == tb$CD[1], off == get(offspring, tb)[1]) %>% 
+        filter(GT_string == tb$GT_string[1]) %>%
         select(Paternal, Maternal)
       return(goo)
     }
@@ -207,9 +207,10 @@ recview_server <- function(input, output, session) {
              AB, CD,
              !!offspring) %>% 
       nest(pos_info = c("id", "CHROM", "POS")) %>% 
-      mutate(tmp_id = seq(1, nrow(.))) %>% 
+      mutate(tmp_id = seq(1, nrow(.)), GT_string = str_c(.$A, .$B, .$C, .$D, .$AB, .$CD, get(offspring, .), sep = "_")) %>% 
       nest(input = !tmp_id) %>% 
-      mutate(output = map(input, goo_inference, offspring, dictionary)) %>% 
+      mutate(output = map(input, goo_inference, dictionary)) %>% 
+      select(-tmp_id) %>% 
       unnest(cols = c("input", "output")) %>%
       filter(!is.na(Paternal), !is.na(Maternal)) %>% 
       unnest(cols = "pos_info")
