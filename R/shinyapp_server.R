@@ -194,7 +194,7 @@ recview_server <- function(input, output, session) {
     if ("No" %in% AB_line) case <- 1
     if ("No" %in% CD_line) case <- 2
     
-    goo_inference <- function(tb, dictionary) {
+    goo_inference <- function(tb) {
       goo <- dictionary %>% 
         filter(GT_string == tb$GT_string[1]) %>%
         select(Paternal, Maternal)
@@ -209,7 +209,7 @@ recview_server <- function(input, output, session) {
       nest(pos_info = c("id", "CHROM", "POS")) %>% 
       mutate(tmp_id = seq(1, nrow(.)), GT_string = str_c(.$A, .$B, .$C, .$D, .$AB, .$CD, get(offspring, .), sep = "_")) %>% 
       nest(input = !tmp_id) %>% 
-      mutate(output = map(input, goo_inference, dictionary)) %>% 
+      mutate(output = map(input, goo_inference)) %>% 
       select(-tmp_id) %>% 
       unnest(cols = c("input", "output")) %>%
       filter(!is.na(Paternal), !is.na(Maternal)) %>% 
@@ -737,7 +737,7 @@ recview_server <- function(input, output, session) {
             legend.margin = margin(0,0,0,0),
             plot.margin = margin(0.3,0,0.3,0),
             panel.background = element_blank(),
-            panel.border = element_rect(color = "grey10", size = 1, fill = NA),
+            panel.border = element_rect(color = "grey10", linewidth = 1, fill = NA),
             panel.grid.major.x = element_line(color = "grey60", size = 0.2),
             panel.grid.major.y = element_blank(),
             panel.spacing.y = unit(2.2, "lines"),
@@ -745,7 +745,7 @@ recview_server <- function(input, output, session) {
             axis.text.y = element_text(size = 20, color = "black"),
             axis.title = element_text(size = 20, face = "bold", color = "black"),
             strip.text = element_text(size = 16, color = "black"),
-            strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
+            strip.background = element_rect(fill = "grey90", color = "grey10", linewidth = 1))
 
     return(p1)
   }
@@ -972,13 +972,14 @@ recview_server <- function(input, output, session) {
       }
 
       avail_cores <- parallel::detectCores()
-      if (length(offspring) <= avail_cores - 1) {
-        use_cores <- length(offspring)
+      need_cores <- length(offspring) * length(ch_in)
+      if (need_cores <= avail_cores - 1) {
+        use_cores <- need_cores
       } else {
         num <- seq(1:avail_cores - 1)
-        multiplication <- ceiling(length(offspring) / num) %>% min()
+        multiplication <- ceiling(need_cores / num) %>% min()
         multi_num <- multiplication * num
-        abs_diff <- abs(length(offspring) - multi_num)
+        abs_diff <- abs(need_cores - multi_num)
         index <- which(abs_diff == min(abs_diff))
         if (length(index) == 1) {
           use_cores <- num[index]
@@ -991,36 +992,36 @@ recview_server <- function(input, output, session) {
       doParallel::registerDoParallel(use_cores)
 
       p_list_list <- list()
-      for (i in 1:length(ch_in)) {
-        res_list <- foreach(j = 1:length(offspring)) %dopar% {
-          rec_analyse(data = dd_in, sc_order = sc_in, chromosome = ch_in[i], offspring = offspring[j],
-                      loc = loc_in, alg = alg_in, thrsd = thrsd_in,
-                      radius = rad_in, step = stp_in, finer_step = fstp_in, finer_threshold = fthrsd_in)
+      
+      p_list_list <- foreach(i = 1:length(ch_in)) %:%
+        foreach(j = 1:length(offspring)) %dopar% {
+          res <- rec_analyse(data = dd_in, sc_order = sc_in, chromosome = ch_in[i], offspring = offspring[j],
+                             loc = loc_in, alg = alg_in, thrsd = thrsd_in,
+                             radius = rad_in, step = stp_in, finer_step = fstp_in, finer_threshold = fthrsd_in)
+          
+          p_list <- tibble(index = 1,
+                           chromosome = ch_in[i],
+                           offspring = offspring[j],
+                           res = res,
+                           resolution = rsn_in,
+                           location = loc_in,
+                           algorithm = alg_in,
+                           threshold = thrsd_in) %>%
+            nest(input = !index) %>%
+            mutate(fig_1 = map(input, rec_plot_1),
+                   fig_4 = map(input, rec_plot_4),
+                   fig_0 = map(input, rec_plot_0))
+          
+          if (loc_in == "Yes") {
+            p_list <- p_list %>%
+              mutate(fig_2 = map(input, rec_plot_2),
+                     fig_3 = map(input, rec_plot_3))
+            list(p_list$fig_1, p_list$fig_2, p_list$fig_3, p_list$fig_4, p_list$fig_0)
+          } else {
+            list(p_list$fig_1, p_list$fig_4, p_list$fig_0)
+          }
         }
-
-        p_list <- tibble(index = seq(1:length(offspring)),
-                          chromosome = ch_in[i],
-                          offspring = offspring,
-                          res = res_list,
-                          resolution = rsn_in,
-                          location = loc_in,
-                          algorithm = alg_in,
-                          threshold = thrsd_in) %>%
-          unnest(cols = "res") %>%
-          nest(input = !index) %>%
-          mutate(fig_1 = map(input, rec_plot_1),
-                 fig_4 = map(input, rec_plot_4),
-                 fig_0 = map(input, rec_plot_0))
-
-        if (loc_in == "Yes") {
-          p_list <- p_list %>%
-            mutate(fig_2 = map(input, rec_plot_2),
-                   fig_3 = map(input, rec_plot_3))
-          p_list_list[[i]] <- list(p_list$fig_1, p_list$fig_2, p_list$fig_3, p_list$fig_4, p_list$fig_0)
-        } else {
-          p_list_list[[i]] <- list(p_list$fig_1, p_list$fig_4, p_list$fig_0)
-        }
-      }
+      
       names(p_list_list) <- ch_in
       doParallel::stopImplicitCluster()
       return(p_list_list)
