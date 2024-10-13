@@ -990,38 +990,44 @@ recview_server <- function(input, output, session) {
       msg_out <- paste0("\n ------------------------------\n Note: There are ", avail_cores, " cores available.\n The analysis is run on ", use_cores, " cores.\n ------------------------------\n\n")
       cat(msg_out)
       doParallel::registerDoParallel(use_cores)
-
-      p_list_list <- list()
       
-      p_list_list <- foreach(i = 1:length(ch_in)) %:%
-        foreach(j = 1:length(offspring)) %dopar% {
+      p_list <- foreach(i = 1:length(ch_in), .combine = bind_rows) %:%
+        foreach(j = 1:length(offspring), .combine = bind_rows) %dopar% {
           res <- rec_analyse(data = dd_in, sc_order = sc_in, chromosome = ch_in[i], offspring = offspring[j],
                              loc = loc_in, alg = alg_in, thrsd = thrsd_in,
                              radius = rad_in, step = stp_in, finer_step = fstp_in, finer_threshold = fthrsd_in)
           
-          p_list <- tibble(index = 1,
-                           chromosome = ch_in[i],
-                           offspring = offspring[j],
-                           res = res,
-                           resolution = rsn_in,
-                           location = loc_in,
-                           algorithm = alg_in,
-                           threshold = thrsd_in) %>%
+          out <- tibble(index = paste(ch_in[i], offspring[j], sep = "_"),
+                        chromosome = ch_in[i],
+                        offspring = offspring[j],
+                        res = res,
+                        resolution = rsn_in,
+                        location = loc_in,
+                        algorithm = alg_in,
+                        threshold = thrsd_in) %>%
             nest(input = !index) %>%
             mutate(fig_1 = map(input, rec_plot_1),
                    fig_4 = map(input, rec_plot_4),
                    fig_0 = map(input, rec_plot_0))
           
           if (loc_in == "Yes") {
-            p_list <- p_list %>%
+            out <- out %>%
               mutate(fig_2 = map(input, rec_plot_2),
                      fig_3 = map(input, rec_plot_3))
-            list(p_list$fig_1, p_list$fig_2, p_list$fig_3, p_list$fig_4, p_list$fig_0)
-          } else {
-            list(p_list$fig_1, p_list$fig_4, p_list$fig_0)
           }
+          return(out)
         }
+      p_list <- p_list %>% separate(col = "index", into = c("chromosome", "offspring"), sep = "_")
       
+      p_list_list <- list()
+      for (i in 1:length(ch_in)) {
+        p_list_mod <- p_list %>% filter(chromosome == ch_in[i])
+        if (loc_in == "Yes") {
+          p_list_list[[i]] <- list(p_list_mod$fig_1, p_list_mod$fig_2, p_list_mod$fig_3, p_list_mod$fig_4, p_list_mod$fig_0)
+        } else {
+          p_list_list[[i]] <- list(p_list_mod$fig_1, p_list_mod$fig_4, p_list_mod$fig_0)
+        }
+      }
       names(p_list_list) <- ch_in
       doParallel::stopImplicitCluster()
       return(p_list_list)
