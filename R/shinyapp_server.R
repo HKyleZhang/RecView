@@ -214,15 +214,6 @@ recview_server <- function(input, output, session) {
       unnest(cols = c("input", "output")) %>%
       filter(!is.na(Paternal), !is.na(Maternal)) %>% 
       unnest(cols = "pos_info")
-    
-    # dd_ind <- data %>%
-    #   select(id, CHROM, POS,
-    #          A, B, C, D,
-    #          AB, CD,
-    #          !!offspring) %>%
-    #   unite(col = "GT_string", A:!!offspring, sep = '_') %>%
-    #   left_join(dictionary, by = "GT_string") %>%
-    #   filter(!is.na(Paternal), !is.na(Maternal))
 
     chr <- sc_order %>%
       filter(CHR == !!chromosome) %>%
