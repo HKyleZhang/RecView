@@ -194,14 +194,34 @@ recview_server <- function(input, output, session) {
     if ("No" %in% AB_line) case <- 1
     if ("No" %in% CD_line) case <- 2
     
+    goo_inference <- function(tb, offspring, dictionary) {
+      goo <- dictionary %>% 
+        filter(A == tb$A[1], B == tb$B[1], C == tb$C[1], D == tb$D[1], AB == tb$AB[1], CD == tb$CD[1], off == get(offspring, tb)[1]) %>% 
+        select(Paternal, Maternal)
+      return(goo)
+    }
+    
     dd_ind <- data %>%
       select(id, CHROM, POS,
              A, B, C, D,
              AB, CD,
-             !!offspring) %>%
-      unite(col = "GT_string", A:!!offspring, sep = '_') %>%
-      left_join(dictionary, by = "GT_string") %>%
-      filter(!is.na(Paternal), !is.na(Maternal))
+             !!offspring) %>% 
+      nest(pos_info = c("id", "CHROM", "POS")) %>% 
+      mutate(tmp_id = seq(1, nrow(.))) %>% 
+      nest(input = !tmp_id) %>% 
+      mutate(output = map(input, goo_inference, offspring, dictionary)) %>% 
+      unnest(cols = c("input", "output")) %>%
+      filter(!is.na(Paternal), !is.na(Maternal)) %>% 
+      unnest(cols = "pos_info")
+    
+    # dd_ind <- data %>%
+    #   select(id, CHROM, POS,
+    #          A, B, C, D,
+    #          AB, CD,
+    #          !!offspring) %>%
+    #   unite(col = "GT_string", A:!!offspring, sep = '_') %>%
+    #   left_join(dictionary, by = "GT_string") %>%
+    #   filter(!is.na(Paternal), !is.na(Maternal))
 
     chr <- sc_order %>%
       filter(CHR == !!chromosome) %>%
@@ -286,12 +306,12 @@ recview_server <- function(input, output, session) {
           while (goo_proportion_diff_tb$diff[i] >= finer_threshold) {
             i <- i + 1
           }
-          cut_point <- seq(goo_proportion_diff_tb$cut_point[input$row_start[1]] + finer_step, goo_proportion_diff_tb$cut_point[i] - finer_step, finer_step)
-          seg_1_proportion <- tibble(cut_point = cut_point, seg_start = cut_point - radius + 1, seg_end = cut_point) %>% 
+          cut_point <- seq(goo_proportion_diff_tb$cut_point[ifelse((input$row_start[1] - 1) == 0, 1, input$row_start[1] - 1)] + finer_step, goo_proportion_diff_tb$cut_point[i] - finer_step, finer_step)
+          seg_1_proportion <- tibble(cut_point = cut_point, seg_start = cut_point - radius, seg_end = cut_point - 1) %>% 
             nest(input = !cut_point) %>% 
             mutate(p_1 = map(input, goo_proportion, tb, side, symbol)) %>% 
             unnest(cols = c("input", "p_1"))
-          seg_2_proportion <- tibble(cut_point = cut_point, seg_start = cut_point, seg_end = cut_point + radius) %>% 
+          seg_2_proportion <- tibble(cut_point = cut_point, seg_start = cut_point, seg_end = cut_point + radius - 1) %>% 
             nest(input = !cut_point) %>% 
             mutate(p_2 = map(input, goo_proportion, tb, side, symbol)) %>% 
             unnest(cols = c("input", "p_2"))
@@ -302,12 +322,12 @@ recview_server <- function(input, output, session) {
         
         running_difference <- function(tb, radius, step, finer_step = 1, finer_threshold = 0.95, side, symbol) {
           snp <- nrow(tb)
-          cut_point <- seq(1, snp - radius * 2, step) + radius - 1
-          seg_1_proportion <- tibble(cut_point = cut_point, seg_start = cut_point - radius + 1, seg_end = cut_point) %>% 
+          cut_point <- seq(1, snp - radius * 2, step) + radius
+          seg_1_proportion <- tibble(cut_point = cut_point, seg_start = cut_point - radius, seg_end = cut_point - 1) %>% 
             nest(input = !cut_point) %>% 
             mutate(p_1 = map(input, goo_proportion, tb, side, symbol)) %>% 
             unnest(cols = c("input", "p_1"))
-          seg_2_proportion <- tibble(cut_point = cut_point, seg_start = cut_point, seg_end = cut_point + radius) %>% 
+          seg_2_proportion <- tibble(cut_point = cut_point, seg_start = cut_point, seg_end = cut_point + radius - 1) %>% 
             nest(input = !cut_point) %>% 
             mutate(p_2 = map(input, goo_proportion, tb, side, symbol)) %>% 
             unnest(cols = c("input", "p_2"))
