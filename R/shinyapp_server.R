@@ -979,7 +979,7 @@ recview_server <- function(input, output, session) {
       }
       msg_out <- paste0("\n ------------------------------\n Note: There are ", avail_cores, " cores available.\n The analysis is run on ", use_cores, " cores.\n ------------------------------\n\n")
       cat(msg_out)
-      doParallel::registerDoParallel(use_cores)
+      doParallel::registerDoParallel(cores = use_cores)
 
       p_list_list <- list()
       for (i in 1:length(ch_in)) {
