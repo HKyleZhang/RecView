@@ -551,7 +551,7 @@ recview_server <- function(input, output, session) {
 
     #### Informative SNP density ----
     interval <- 1e5
-    digits <- (log10(interval) %>% floor()) + 1
+    digits <- floor(log10(interval)) + 1
     if (case != 1) {
       breaks_pat <- seq(0, ceiling(max(get("POS_chr", res[[1]] %>% filter(Side == "Paternal")))/10^digits) * 10^digits, interval)
       hist_pat <- hist(get("POS_chr", res[[1]] %>% filter(Side == "Paternal")), breaks = breaks_pat, plot = F)
