@@ -728,7 +728,7 @@ recview_server <- function(input, output, session) {
             legend.margin = margin(0,0,0,0),
             plot.margin = margin(0.3,0,0.3,0),
             panel.background = element_blank(),
-            panel.border = element_rect(color = "grey10", size = 1, fill = NA),
+            panel.border = element_rect(color = "grey10", linewidth = 1, fill = NA),
             panel.grid.major.x = element_line(color = "grey60", size = 0.2),
             panel.grid.major.y = element_blank(),
             panel.spacing.y = unit(2.2, "lines"),
@@ -736,7 +736,7 @@ recview_server <- function(input, output, session) {
             axis.text.y = element_text(size = 20, color = "black"),
             axis.title = element_text(size = 20, face = "bold", color = "black"),
             strip.text = element_text(size = 16, color = "black"),
-            strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
+            strip.background = element_rect(fill = "grey90", color = "grey10", linewidth = 1))
 
     return(p1)
   }
@@ -776,13 +776,13 @@ recview_server <- function(input, output, session) {
         theme(plot.title = element_text(size = 20, face = "bold"),
               plot.margin = margin(0.3,0,0.3,0, unit = "mm"),
               panel.background = element_blank(),
-              panel.border = element_rect(color = "grey10", size = 1, fill = NA),
+              panel.border = element_rect(color = "grey10", linewidth = 1, fill = NA),
               panel.grid.major = element_line(color = "grey60", size = 0.2),
               panel.spacing.y = unit(2.2, "lines"),
               axis.text = element_text(size = 16, color = "black"),
               axis.title = element_text(size = 20, face = "bold", color = "black"),
               strip.text = element_text(size = 16, color = "black"),
-              strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
+              strip.background = element_rect(fill = "grey90", color = "grey10", linewidth = 1))
       
       p2 <- list(p2)
     } else if (algorithm == "CCS") {
@@ -840,7 +840,7 @@ recview_server <- function(input, output, session) {
               legend.margin = margin(0,0,0,0),
               plot.margin = margin(0.3,0,0.3,0),
               panel.background = element_blank(),
-              panel.border = element_rect(color = "grey10", size = 1, fill = NA),
+              panel.border = element_rect(color = "grey10", linewidth = 1, fill = NA),
               panel.grid.major.x = element_line(color = "grey60", size = 0.2),
               panel.grid.major.y = element_blank(),
               panel.spacing.y = unit(2.2, "lines"),
@@ -850,7 +850,7 @@ recview_server <- function(input, output, session) {
               axis.title.y = element_blank(),
               axis.ticks.y = element_blank(),
               strip.text = element_text(size = 16, color = "black"),
-              strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
+              strip.background = element_rect(fill = "grey90", color = "grey10", linewidth = 1))
 
       p2 <- list(p2)
     }
@@ -907,13 +907,13 @@ recview_server <- function(input, output, session) {
       theme(plot.title = element_text(size = 20, face = "bold"),
             plot.margin = margin(5,10,0,0),
             panel.background = element_blank(),
-            panel.border = element_rect(color = "grey10", size = 1, fill = NA),
+            panel.border = element_rect(color = "grey10", linewidth = 1, fill = NA),
             panel.grid.major = element_line(color = "grey60", size = 0.2),
             panel.spacing.y = unit(2.2, "lines"),
             axis.text = element_text(size = 16, color = "black"),
             axis.title = element_text(size = 20, face = "bold", color = "black"),
             strip.text = element_text(size = 16, color = "black"),
-            strip.background = element_rect(fill = "grey90", color = "grey10", size = 1))
+            strip.background = element_rect(fill = "grey90", color = "grey10", linewidth = 1))
 
     # if (location == "Yes") {
     #   res3_plot <- res[[3]] %>% filter(`Chromosomal position (Mb)` != "-") %>%
@@ -977,10 +977,14 @@ recview_server <- function(input, output, session) {
           use_cores <- num[max(index)]
         }
       }
-      msg_out <- paste0("\n ------------------------------\n Note: There are ", avail_cores, " cores available.\n The analysis is run on ", use_cores, " cores.\n ------------------------------\n\n")
-      cat(msg_out)
       doParallel::registerDoParallel(cores = use_cores)
-
+      msg_out <- paste0("\nNotice -----------------------\n - There are ", avail_cores, 
+                        " cores available.\n - The analysis is run on ", getDoParWorkers(), 
+                        " cores.\n - doPar backend registered? ", getDoParRegistered(),
+                        ".\n - doPar backend name and version: ", getDoParName(), " version ", getDoParVersion(), 
+                        ".\n------------------------------\n\n")
+      cat(msg_out)
+      
       p_list_list <- list()
       for (i in 1:length(ch_in)) {
         res_list <- foreach(j = 1:length(offspring)) %dopar% {
