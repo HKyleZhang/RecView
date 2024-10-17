@@ -180,19 +180,6 @@ recview_server <- function(input, output, session) {
     } else if (chromosome == "X") {
       dictionary <- dictionary %>% filter(Chromosome_type == "X")
     }
-
-    AB_line <- c("Yes", "Yes", "Yes")
-    CD_line <- c("Yes", "Yes", "Yes")
-    case <- 0
-    if (!("A" %in% colnames(data))) AB_line[1] <- "No"
-    if (!("B" %in% colnames(data))) AB_line[2] <- "No"
-    if (!("AB" %in% colnames(data))) AB_line[3] <- "No"
-    if (!("C" %in% colnames(data))) CD_line[1] <- "No"
-    if (!("D" %in% colnames(data))) CD_line[2] <- "No"
-    if (!("CD" %in% colnames(data))) CD_line[3] <- "No"
-
-    if ("No" %in% AB_line) case <- 1
-    if ("No" %in% CD_line) case <- 2
     
     goo_inference <- function(tb, dictionary) {
       goo <- dictionary %>% 
@@ -261,6 +248,10 @@ recview_server <- function(input, output, session) {
       filter(Grandparent_of_origin != "N") %>%
       mutate(Grandparent_of_origin_value = NaN, Side = "Maternal")
 
+    case <- 0
+    if (nrow(res_par) == 0) case <- 1
+    if (nrow(res_mar) == 0) case <- 2
+    
     res <- list()
     res[[1]] <- bind_rows(res_par, res_mar) %>%
       mutate(Grandparent_of_origin_value = if_else(Grandparent_of_origin == "D", 0, Grandparent_of_origin_value),
@@ -405,52 +396,59 @@ recview_server <- function(input, output, session) {
       } else if (alg == "CCS") {
         check_continuity <- function(tb, side) {
           tb <- tb %>%
-            filter(Side == !!side) %>%
-            mutate(goo_minus = c(0, .$Grandparent_of_origin[1:(length(.$Grandparent_of_origin)-1)]))
-
-          similarity <- ifelse(tb$Grandparent_of_origin == tb$goo_minus, 1, 0)
-
-          zeros <- which(similarity == 0)
-          sepa <- list()
-          if (zeros[length(zeros)] != nrow(tb)) {
-            sepa[[1]] <- c(zeros, nrow(tb))
-            sepa[[2]] <- "incl"
-          } else {
-            sepa[[1]] <- zeros
-            sepa[[2]] <- "excl"
-          }
-
-          if (sepa[[2]] == "incl") {
-            tb_zero <- tb[sepa[[1]][1:(length(sepa[[1]])-1)],] %>% mutate(continuity = 0, abs_cumulative_continuity = 0)
-          } else {
-            tb_zero <- tb[sepa[[1]][1:length(sepa[[1]])],] %>% mutate(continuity = 0, abs_cumulative_continuity = 0)
-          }
-
-          tb_list <- list()
-          i <- 1
-          for (j in 2:length(sepa[[1]])) {
-            if (sepa[[1]][j] - 1 != sepa[[1]][j-1])  {
-              tb_list[[i]] <- tb[(sepa[[1]][j-1] + 1):(sepa[[1]][j]-1),]
-              if (sepa[[1]][j] == nrow(tb)) {
-                if (sepa[[2]] == "incl") {
-                  tb_list[[i]] <- tb[(sepa[[1]][j-1] + 1):sepa[[1]][j],]
-                } else {
-                  tb_list[[i]] <- tb[(sepa[[1]][j-1] + 1):(sepa[[1]][j]-1),]
-                }
-              }
-              if (unique(tb_list[[i]]$Grandparent_of_origin) %in% c("A","C")) {
-                tb_list[[i]] <- tb_list[[i]] %>% mutate(continuity = seq(1,nrow(.)), abs_cumulative_continuity = rep(nrow(.), times = nrow(.)))
-              } else if (unique(tb_list[[i]]$Grandparent_of_origin) %in% c("B","D")) {
-                tb_list[[i]] <- tb_list[[i]] %>% mutate(continuity = seq(-1,-nrow(.),-1), abs_cumulative_continuity = rep(nrow(.), times = nrow(.)))
-              }
-              i <- i + 1
+            filter(Side == !!side)
+          
+          if (nrow(tb) != 0) {
+            tb <- tb %>%
+              mutate(goo_minus = c(0, .$Grandparent_of_origin[1:(length(.$Grandparent_of_origin)-1)]))
+  
+            similarity <- ifelse(tb$Grandparent_of_origin == tb$goo_minus, 1, 0)
+  
+            zeros <- which(similarity == 0)
+            sepa <- list()
+            if (zeros[length(zeros)] != nrow(tb)) {
+              sepa[[1]] <- c(zeros, nrow(tb))
+              sepa[[2]] <- "incl"
+            } else {
+              sepa[[1]] <- zeros
+              sepa[[2]] <- "excl"
             }
+  
+            if (sepa[[2]] == "incl") {
+              tb_zero <- tb[sepa[[1]][1:(length(sepa[[1]])-1)],] %>% mutate(continuity = 0, abs_cumulative_continuity = 0)
+            } else {
+              tb_zero <- tb[sepa[[1]][1:length(sepa[[1]])],] %>% mutate(continuity = 0, abs_cumulative_continuity = 0)
+            }
+  
+            tb_list <- list()
+            i <- 1
+            for (j in 2:length(sepa[[1]])) {
+              if (sepa[[1]][j] - 1 != sepa[[1]][j-1])  {
+                tb_list[[i]] <- tb[(sepa[[1]][j-1] + 1):(sepa[[1]][j]-1),]
+                if (sepa[[1]][j] == nrow(tb)) {
+                  if (sepa[[2]] == "incl") {
+                    tb_list[[i]] <- tb[(sepa[[1]][j-1] + 1):sepa[[1]][j],]
+                  } else {
+                    tb_list[[i]] <- tb[(sepa[[1]][j-1] + 1):(sepa[[1]][j]-1),]
+                  }
+                }
+                if (unique(tb_list[[i]]$Grandparent_of_origin) %in% c("A","C")) {
+                  tb_list[[i]] <- tb_list[[i]] %>% mutate(continuity = seq(1,nrow(.)), abs_cumulative_continuity = rep(nrow(.), times = nrow(.)))
+                } else if (unique(tb_list[[i]]$Grandparent_of_origin) %in% c("B","D")) {
+                  tb_list[[i]] <- tb_list[[i]] %>% mutate(continuity = seq(-1,-nrow(.),-1), abs_cumulative_continuity = rep(nrow(.), times = nrow(.)))
+                }
+                i <- i + 1
+              }
+            }
+  
+            tb <- reduce(tb_list, bind_rows) %>%
+              bind_rows(tb_zero) %>%
+              arrange(POS_chr) %>%
+              select(-goo_minus)
+          } else {
+            tb <- tb %>% mutate(continuity = as.numeric())
           }
-
-          tb <- reduce(tb_list, bind_rows) %>%
-            bind_rows(tb_zero) %>%
-            arrange(POS_chr) %>%
-            select(-goo_minus)
+          
           return(tb)
         }
 
@@ -500,11 +498,19 @@ recview_server <- function(input, output, session) {
         tb_mat <- check_continuity(res[[1]], side = "Maternal")
         res[[2]] <- bind_rows(tb_pat, tb_mat)
 
-        tb_pat_mod <- backtrack_position(tb_pat, threshold = thrsd)
-        if (nrow(tb_pat_mod) != 0) {
-          tb_pat_mod <- tb_pat_mod %>%
-            mutate(Origin = "Paternal", POS_chr_mb = POS_chr / 1e6) %>%
-            select(Origin, POS_chr, POS_chr_mb, everything())
+        if (nrow(tb_pat) != 0) {
+          tb_pat_mod <- backtrack_position(tb_pat, threshold = thrsd)
+          if (nrow(tb_pat_mod) != 0) {
+            tb_pat_mod <- tb_pat_mod %>%
+              mutate(Origin = "Paternal", POS_chr_mb = POS_chr / 1e6) %>%
+              select(Origin, POS_chr, POS_chr_mb, everything())
+          } else {
+            tb_pat_mod <- tibble(Origin = "Paternal",
+                                 POS_chr = "-",
+                                 POS_chr_mb = "-",
+                                 Left_boundary = "-",
+                                 Right_boundary = "-")
+          }
         } else {
           tb_pat_mod <- tibble(Origin = "Paternal",
                                POS_chr = "-",
@@ -517,11 +523,19 @@ recview_server <- function(input, output, session) {
         tb_pat_mod$Left_boundary <- as.character(tb_pat_mod$Left_boundary)
         tb_pat_mod$Right_boundary <- as.character(tb_pat_mod$Right_boundary)
 
-        tb_mat_mod <- backtrack_position(tb_mat, threshold = thrsd)
-        if (nrow(tb_mat_mod) != 0) {
-          tb_mat_mod <- tb_mat_mod %>%
-            mutate(Origin = "Maternal", POS_chr_mb = POS_chr / 1e6) %>%
-            select(Origin, POS_chr, POS_chr_mb, everything())
+        if (nrow(tb_mat) != 0) {
+          tb_mat_mod <- backtrack_position(tb_mat, threshold = thrsd)
+          if (nrow(tb_mat_mod) != 0) {
+            tb_mat_mod <- tb_mat_mod %>%
+              mutate(Origin = "Maternal", POS_chr_mb = POS_chr / 1e6) %>%
+              select(Origin, POS_chr, POS_chr_mb, everything())
+          } else {
+            tb_mat_mod <- tibble(Origin = "Maternal",
+                                 POS_chr = "-",
+                                 POS_chr_mb = "-",
+                                 Left_boundary = "-",
+                                 Right_boundary = "-")
+          }
         } else {
           tb_mat_mod <- tibble(Origin = "Maternal",
                                POS_chr = "-",
@@ -987,7 +1001,7 @@ recview_server <- function(input, output, session) {
       
       p_list_list <- list()
       for (i in 1:length(ch_in)) {
-        res_list <- foreach(j = 1:length(offspring)) %dopar% {
+        res_list <- foreach(j = 1:length(offspring), .export = "rec_analyse") %dopar% {
           rec_analyse(data = dd_in, sc_order = sc_in, chromosome = ch_in[i], offspring = offspring[j],
                       loc = loc_in, alg = alg_in, thrsd = thrsd_in,
                       radius = rad_in, step = stp_in, finer_step = fstp_in, finer_threshold = fthrsd_in)
