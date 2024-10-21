@@ -23,7 +23,7 @@ recview_server <- function(input, output, session) {
         str_split(pattern = ',') %>%
         unlist() %>%
         str_sort(numeric = T)
-      ind_id <- all_columns[!(all_columns %in% c("id", "CHROM", "POS", "A", "B", "C", "D", "AB", "CD"))]
+      ind_id <- all_columns[!(all_columns %in% c("id", "CHROM", "POS", "Missing_ind_num", "Missing_ind", "A", "B", "C", "D", "AB", "CD"))]
       selectInput(inputId = "off",
                   label = "Choose Offspring(s):",
                   multiple = TRUE,
@@ -77,7 +77,13 @@ recview_server <- function(input, output, session) {
     progress$set(message = "Loading data...")
 
     if(!is.null(input$genofile)) {
-      read_csv(input$genofile$datapath, col_types = cols())
+      read_csv(input$genofile$datapath, col_types = list(Missing_ind = col_character(),
+                                                         A = col_character(),
+                                                         B = col_character(),
+                                                         C = col_character(),
+                                                         D = col_character(),
+                                                         AB = col_character(),
+                                                         CD = col_character()))
     } else {
       return(FALSE)
     }
@@ -173,35 +179,89 @@ recview_server <- function(input, output, session) {
     dt_path <- system.file("dictionary", package = "RecView")
     dictionary <- read_tsv(file = list.files(path = dt_path, pattern = "dict_complete.tsv", full.names = T), col_types = cols()) %>% 
       filter(!(Paternal == "N" & Maternal == "N"))
+    dictionary_miss <- read_tsv(file = list.files(path = dt_path, pattern = "dict_MissingIndividual_complete.tsv", full.names = T), col_types = cols()) %>% 
+      filter(!(Paternal == "N" & Maternal == "N"))
     if ((chromosome != "Z") && (chromosome != "X")) {
       dictionary <- dictionary %>% filter(Chromosome_type != "Z", Chromosome_type != "X")
+      dictionary_miss <- dictionary_miss %>% filter(Chromosome_type != "Z", Chromosome_type != "X")
     } else if (chromosome == "Z") {
       dictionary <- dictionary %>% filter(Chromosome_type == "Z")
+      dictionary_miss <- dictionary_miss %>% filter(Chromosome_type == "Z")
     } else if (chromosome == "X") {
       dictionary <- dictionary %>% filter(Chromosome_type == "X")
+      dictionary_miss <- dictionary_miss %>% filter(Chromosome_type == "X")
     }
     
-    goo_inference <- function(tb, dictionary) {
-      goo <- dictionary %>% 
-        filter(GT_string == tb$GT_string[1]) %>%
-        select(Paternal, Maternal)
+    goo_inference <- function(tb, dictionary, missing_data = FALSE) {
+      if (!missing_data) {
+        goo <- dictionary %>% 
+          filter(GT_string == tb$GT_string[1]) %>%
+          select(Paternal, Maternal)
+      } else {
+        goo <- list()
+        for (i in seq(min(tb$Missing_ind_num), max(tb$Missing_ind_num))) {
+          for (j in unique(tb$Missing_ind)) {
+            tb_tmp <- tb %>% 
+              filter(Missing_ind_num == i, Missing_ind == j)
+            
+            goo[[length(goo) + 1]] <- dictionary %>% 
+              filter(Missing_ind_num == i, Missing_ind == j, GT_string == tb_tmp$GT_string[1]) %>% 
+              select(Paternal, Maternal)
+          }
+        }
+        goo <- reduce(goo, bind_rows)
+      }
       return(goo)
     }
     
-    dd_ind <- data %>%
+    dd_complete <- data %>%
+      filter(Missing_ind_num == 0) %>% 
       select(id, CHROM, POS,
              A, B, C, D,
              AB, CD,
-             !!offspring) %>% 
-      nest(pos_info = c("id", "CHROM", "POS")) %>% 
-      mutate(tmp_id = seq(1, nrow(.)), GT_string = str_c(.$A, .$B, .$C, .$D, .$AB, .$CD, get(offspring, .), sep = "_")) %>% 
-      nest(input = !tmp_id) %>% 
-      mutate(output = map(input, goo_inference, dictionary)) %>% 
-      select(-tmp_id) %>% 
-      unnest(cols = c("input", "output")) %>%
-      filter(!is.na(Paternal), !is.na(Maternal)) %>% 
-      unnest(cols = "pos_info")
-
+             !!offspring)
+    
+    if (nrow(dd_complete) > 0) {
+      dd_complete <- dd_complete %>% 
+        nest(pos_info = c("id", "CHROM", "POS")) %>% 
+        mutate(tmp_id = seq(1, nrow(.)), GT_string = str_c(.$A, .$B, .$C, .$D, .$AB, .$CD, get(offspring, .), sep = "_")) %>% 
+        nest(input = !tmp_id) %>% 
+        mutate(output = map(input, goo_inference, dictionary, FALSE)) %>% 
+        select(-tmp_id) %>% 
+        unnest(cols = c("input", "output")) %>%
+        filter(!is.na(Paternal), !is.na(Maternal)) %>% 
+        unnest(cols = "pos_info")
+    } else {
+      dd_complete <- dd_complete %>% 
+        mutate(GT_string = as.character(), Paternal = as.character(), Maternal = as.character())
+    }
+    
+    dd_miss <- data %>%
+      filter(Missing_ind_num > 0) %>% 
+      select(id, CHROM, POS,
+             Missing_ind_num,
+             Missing_ind,
+             A, B, C, D,
+             AB, CD,
+             !!offspring)
+    
+    if (nrow(dd_miss) > 0) {
+      dd_miss <- dd_miss %>% 
+        nest(pos_info = c("id", "CHROM", "POS")) %>% 
+        replace_na(list(A = "NA", B = "NA", C = "NA", D = "NA", AB = "NA", CD = "NA")) %>% 
+        mutate(tmp_id = seq(1, nrow(.)), GT_string = str_c(.$A, .$B, .$C, .$D, .$AB, .$CD, get(offspring, .), sep = "_")) %>% 
+        nest(input = !tmp_id) %>% 
+        mutate(output = map(input, goo_inference, dictionary_miss, TRUE)) %>% 
+        unnest(cols = c("input", "output")) %>%
+        filter(!is.na(Paternal), !is.na(Maternal)) %>% 
+        unnest(cols = "pos_info")
+    } else {
+      dd_miss <- dd_miss %>% 
+        mutate(GT_string = as.character(), Paternal = as.character(), Maternal = as.character())
+    }
+    
+    dd_ind <- bind_rows(dd_complete, dd_miss)
+    
     chr <- sc_order %>%
       filter(CHR == !!chromosome) %>%
       arrange(order) %>%
