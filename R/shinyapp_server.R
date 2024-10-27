@@ -19,9 +19,8 @@ recview_server <- function(input, output, session) {
 
   output$off <- renderUI({
     if(!is.null(input$genofile)) {
-      all_columns <- readLines(input$genofile$datapath, n = 1) %>%
-        str_split(pattern = ',') %>%
-        unlist() %>%
+      all_columns <- read_csv(input$genofile$datapath, n_max = 1, col_types = cols()) %>%
+        colnames() %>% 
         str_sort(numeric = T)
       ind_id <- all_columns[!(all_columns %in% c("id", "CHROM", "POS", "Missing_ind_num", "Missing_ind", "A", "B", "C", "D", "AB", "CD"))]
       selectInput(inputId = "off",
