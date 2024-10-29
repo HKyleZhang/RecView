@@ -9,18 +9,32 @@ recview_server <- function(input, output, session) {
          width = 383,
          height = 70)
   }, deleteFile = FALSE)
+  
+  ### Files input ----
+  roots <- c("Current Working Directory" = ".", Home = fs::path_home())
+  shinyFiles::shinyFileChoose(input, id = "genofile", roots = roots, defaultRoot = "Current Working Directory", session = session, filetypes = c('', 'csv'))
+  shinyFiles::shinyFileChoose(input, id = "scfile", roots = roots, defaultRoot = "Current Working Directory", session = session, filetypes = c('', 'csv'))
+  
+  output$genofile_attached <- renderUI({
+    renderPrint({cat(shinyFiles::parseFilePaths(roots, input$genofile)$name)})
+  })
+  
+  output$scfile_attached <- renderUI({
+    renderPrint({cat(shinyFiles::parseFilePaths(roots, input$scfile)$name)})
+  })
+  
   ### Offspring input droplist ----
   output$genoexist <- reactive({
-    if(!is.null(input$genofile)) {
+    if(!is.integer(input$genofile)) {
       return(1)
     }
   })
   outputOptions(output, 'genoexist', suspendWhenHidden=FALSE)
 
   output$off <- renderUI({
-    if(!is.null(input$genofile)) {
-      all_columns <- read_csv(input$genofile$datapath, n_max = 1, col_types = cols()) %>%
-        colnames() %>% 
+    if(!is.integer(input$genofile)) {
+      all_columns <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 1, col_types = cols(), progress = FALSE) %>%
+        colnames() %>%
         str_sort(numeric = T)
       ind_id <- all_columns[!(all_columns %in% c("id", "CHROM", "POS", "Missing_ind_num", "Missing_ind", "A", "B", "C", "D", "AB", "CD"))]
       selectInput(inputId = "off",
@@ -32,15 +46,15 @@ recview_server <- function(input, output, session) {
     })
   ### Chromosome input droplist ----
   output$scexist <- reactive({
-    if(!is.null(input$scfile)) {
+    if(!is.integer(input$scfile)) {
       return(1)
     }
   })
   outputOptions(output, 'scexist', suspendWhenHidden=FALSE)
   
   output$chr <- renderUI({
-    if(!is.null(input$scfile)) {
-      all_chr <- read_csv(input$scfile$datapath, col_types = cols(CHR = col_character())) %>% 
+    if(!is.integer(input$scfile)) {
+      all_chr <- read_csv(shinyFiles::parseFilePaths(roots, input$scfile)$datapath, col_types = cols(CHR = col_character())) %>% 
         pull(CHR) %>% 
         str_sort(numeric = T)
       selectInput(inputId = "chr",
@@ -53,8 +67,8 @@ recview_server <- function(input, output, session) {
   
   ### Show the result of which chromosome droplist ----
   output$show_chr <- renderUI({
-    if(!is.null(input$scfile)) {
-      all_chr <- read_csv(input$scfile$datapath, col_types = cols(CHR = col_character())) %>% 
+    if(!is.integer(input$scfile)) {
+      all_chr <- read_csv(shinyFiles::parseFilePaths(roots, input$scfile)$datapath, col_types = cols(CHR = col_character())) %>% 
         pull(CHR) %>% 
         str_sort(numeric = T) %>% 
         unique()
@@ -70,9 +84,9 @@ recview_server <- function(input, output, session) {
   
   ## 2.1 Read-in and Settings ----
   ### Check if genotype file exists ----
-  dd <- reactive({if(is.null(input$genofile)) return(FALSE)})
+  dd <- reactive({if(is.integer(input$genofile)) return(FALSE)})
   ### Check if scaffold file exits ----
-  sc <- reactive({if(is.null(input$scfile)) return(FALSE)})
+  sc <- reactive({if(is.integer(input$scfile)) return(FALSE)})
   ### Obtain chromosome setting ----
   ch <- reactive({req(input$chr)})
   ### Obtain offspring setting ----
@@ -975,8 +989,8 @@ recview_server <- function(input, output, session) {
         ch_in[i] <- str_trim(ch_in[i], side = "both")
       }
 
-      if (file.exists(paste0(input$genofile$name, ".idx"))) {
-        read_rows <- read_tsv(paste0(input$genofile$name, ".idx"), col_types = cols(POS = col_character()), progress = FALSE) %>% 
+      if (file.exists(paste0(shinyFiles::parseFilePaths(roots, input$genofile)$name, ".idx"))) {
+        read_rows <- read_tsv(paste0(shinyFiles::parseFilePaths(roots, input$genofile)$name, ".idx"), col_types = cols(POS = col_character()), progress = FALSE) %>% 
           filter(CHR %in% ch_in) %>% 
           pull(POS) %>% 
           str_trim(side = "both") %>% 
@@ -984,12 +998,12 @@ recview_server <- function(input, output, session) {
           str_split_1(pattern = ",") %>% 
           as.numeric()
         
-        header <- read_csv(input$genofile$datapath, n_max = 1, col_types = cols()) %>% colnames()
-        laf <- LaF::laf_open_csv(filename = input$genofile$datapath, column_types = c(rep("character", 2), "numeric", rep("character", 2), rep("numeric", length(header) - 5)), column_names = header, skip = 1)
+        header <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 1, col_types = cols()) %>% colnames()
+        laf <- LaF::laf_open_csv(filename = shinyFiles::parseFilePaths(roots, input$genofile)$datapath, column_types = c(rep("character", 2), "numeric", rep("character", 2), rep("numeric", length(header) - 5)), column_names = header, skip = 1)
         dd_in <- laf[read_rows,] %>% 
           `colnames<-`(.,header)
       } else {
-        dd_in <- read_csv(input$genofile$datapath, col_types = cols(Missing_ind = col_character(),
+        dd_in <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(Missing_ind = col_character(),
                                                                     A = col_character(),
                                                                     B = col_character(),
                                                                     C = col_character(),
@@ -999,7 +1013,7 @@ recview_server <- function(input, output, session) {
                           progress = FALSE)
       }
       
-      sc_in <- read_csv(input$scfile$datapath, col_types = cols(CHR = col_character(),
+      sc_in <- read_csv(shinyFiles::parseFilePaths(roots, input$scfile)$datapath, col_types = cols(CHR = col_character(),
                                                                 order = col_double(),
                                                                 scaffold = col_character(),
                                                                 size = col_double(),
