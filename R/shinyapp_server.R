@@ -41,7 +41,7 @@ recview_server <- function(input, output, session) {
   output$chr <- renderUI({
     if(!is.null(input$scfile)) {
       all_chr <- read_csv(input$scfile$datapath, col_types = cols(CHR = col_character())) %>% 
-        .$CHR %>% 
+        pull(CHR) %>% 
         str_sort(numeric = T)
       selectInput(inputId = "chr",
                   label = "Choose Chromosome(s):",
@@ -55,7 +55,7 @@ recview_server <- function(input, output, session) {
   output$show_chr <- renderUI({
     if(!is.null(input$scfile)) {
       all_chr <- read_csv(input$scfile$datapath, col_types = cols(CHR = col_character())) %>% 
-        .$CHR %>% 
+        pull(CHR) %>% 
         str_sort(numeric = T) %>% 
         unique()
       selectInput(inputId = "show_chr", 
@@ -69,59 +69,20 @@ recview_server <- function(input, output, session) {
   
   
   ## 2.1 Read-in and Settings ----
-  ### Read-in data file ----
-  dd <- reactive({
-    progress <- shiny::Progress$new()
-    on.exit(progress$close())
-    progress$set(message = "Loading data...")
-
-    if(!is.null(input$genofile)) {
-      read_csv(input$genofile$datapath, col_types = list(Missing_ind = col_character(),
-                                                         A = col_character(),
-                                                         B = col_character(),
-                                                         C = col_character(),
-                                                         D = col_character(),
-                                                         AB = col_character(),
-                                                         CD = col_character()))
-    } else {
-      return(FALSE)
-    }
-  })
-
-  ### Read-in scaffold order and orientation file ----
-  sc <- reactive({
-    if(!is.null(input$scfile)) {
-      read_csv(input$scfile$datapath,
-               col_types = cols(
-                 CHR = col_character(),
-                 order = col_double(),
-                 scaffold = col_character(),
-                 size = col_double(),
-                 orientation = col_character()))
-    } else {
-      return(FALSE)
-    }
-  })
+  ### Check if genotype file exists ----
+  dd <- reactive({if(is.null(input$genofile)) return(FALSE)})
+  ### Check if scaffold file exits ----
+  sc <- reactive({if(is.null(input$scfile)) return(FALSE)})
   ### Obtain chromosome setting ----
-  ch <- reactive({
-    req(input$chr)
-  })
+  ch <- reactive({req(input$chr)})
   ### Obtain offspring setting ----
-  of <- reactive({
-    req(input$off)
-  })
+  of <- reactive({req(input$off)})
   ### Obtain resolution setting ----
-  rsn <- reactive({
-    input$resolution
-  })
+  rsn <- reactive({input$resolution})
   ### Locate recombination or not ----
-  loc <- reactive({
-    input$locate
-  })
+  loc <- reactive({input$locate})
   ### Obtain algorithm setting ----
-  alg <- reactive({
-    input$algorithm
-  })
+  alg <- reactive({input$algorithm})
   ### Obtain setting for PD----
   rad <- reactive({
     if (input$radius != '') {
@@ -160,16 +121,10 @@ recview_server <- function(input, output, session) {
     }
   })
   ### Obtain saving setting ----
-  sop <- reactive({
-      input$save_opt
-  })
-  sop2 <- reactive({
-      input$save_opt2
-  })
+  sop <- reactive({input$save_opt})
+  sop2 <- reactive({input$save_opt2})
   ### Chromosome visualisation setting ----
-  show_ch <- reactive({
-    req(input$show_chr)
-  })
+  show_ch <- reactive({req(input$show_chr)})
 
 
   ## 2.2 Main ----
@@ -1014,9 +969,43 @@ recview_server <- function(input, output, session) {
       for (i in 1:length(offspring)) {
         offspring[i] <- str_trim(offspring[i], side = "both")
       }
+      
+      ch_in <- ch()
+      for (i in 1:length(ch_in)) {
+        ch_in[i] <- str_trim(ch_in[i], side = "both")
+      }
 
-      dd_in <- dd()
-      sc_in <- sc()
+      if (file.exists(paste0(input$genofile$name, ".idx"))) {
+        read_rows <- read_tsv(paste0(input$genofile$name, ".idx"), col_types = cols(POS = col_character()), progress = FALSE) %>% 
+          filter(CHR %in% ch_in) %>% 
+          pull(POS) %>% 
+          str_trim(side = "both") %>% 
+          str_flatten_comma() %>% 
+          str_split_1(pattern = ",") %>% 
+          as.numeric()
+        
+        header <- read_csv(input$genofile$datapath, n_max = 1, col_types = cols()) %>% colnames()
+        laf <- LaF::laf_open_csv(filename = input$genofile$datapath, column_types = c(rep("character", 2), "numeric", rep("character", 2), rep("numeric", length(header) - 5)), column_names = header, skip = 1)
+        dd_in <- laf[read_rows,] %>% 
+          `colnames<-`(.,header)
+      } else {
+        dd_in <- read_csv(input$genofile$datapath, col_types = cols(Missing_ind = col_character(),
+                                                                    A = col_character(),
+                                                                    B = col_character(),
+                                                                    C = col_character(),
+                                                                    D = col_character(),
+                                                                    AB = col_character(),
+                                                                    CD = col_character()),
+                          progress = FALSE)
+      }
+      
+      sc_in <- read_csv(input$scfile$datapath, col_types = cols(CHR = col_character(),
+                                                                order = col_double(),
+                                                                scaffold = col_character(),
+                                                                size = col_double(),
+                                                                orientation = col_character()),
+                        progress = FALSE)
+      
       loc_in <- loc()
       alg_in <- alg()
       thrsd_in <- thrsd()
@@ -1028,11 +1017,6 @@ recview_server <- function(input, output, session) {
         rsn_in <- "High"
       } else {
         rsn_in <- rsn()
-      }
-
-      ch_in <- ch()
-      for (i in 1:length(ch_in)) {
-        ch_in[i] <- str_trim(ch_in[i], side = "both")
       }
 
       avail_cores <- parallel::detectCores()
