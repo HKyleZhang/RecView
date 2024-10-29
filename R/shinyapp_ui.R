@@ -8,8 +8,8 @@ recview_ui <- function(request) {
     imageOutput("title", height = "70px", width = "383px"),
     h5("Maintainer: Hongkai Zhang"),
     sidebarPanel(width = 3,
-      fileInput(inputId = "genofile", label = "Genotype file:", width = "95%", placeholder = ".csv"),
-      fileInput(inputId = "scfile", label = "Scaffold file:", width = "95%", placeholder = ".csv"),
+      fileInput(inputId = "genofile", label = "Genotype file:", accept = ".csv", width = "95%", placeholder = ".csv"),
+      fileInput(inputId = "scfile", label = "Scaffold file:", accept = ".csv", width = "95%", placeholder = ".csv"),
       tags$style(".progress-bar {background-color: #008AA4;}"),
       conditionalPanel(
         condition = "output.genoexist == 1",
