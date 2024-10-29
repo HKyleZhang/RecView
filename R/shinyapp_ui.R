@@ -8,9 +8,17 @@ recview_ui <- function(request) {
     imageOutput("title", height = "70px", width = "383px"),
     h5("Maintainer: Hongkai Zhang"),
     sidebarPanel(width = 3,
-      fileInput(inputId = "genofile", label = "Genotype file:", accept = ".csv", width = "95%", placeholder = ".csv"),
-      fileInput(inputId = "scfile", label = "Scaffold file:", accept = ".csv", width = "95%", placeholder = ".csv"),
-      tags$style(".progress-bar {background-color: #008AA4;}"),
+      shinyFiles::shinyFilesButton(id = "genofile", label = "Select genotype file", title = "Please select a file", multiple = FALSE, viewtype = "detail"),
+      conditionalPanel(
+        condition = "output.genoexist == 1",
+        uiOutput(outputId = "genofile_attached"),
+      ),
+      p(),
+      shinyFiles::shinyFilesButton(id = "scfile", label = "Select scaffold file", title = "Please select a file", multiple = FALSE, viewtype = "detail"),
+      conditionalPanel(
+        condition = "output.scexist == 1",
+        uiOutput(outputId = "scfile_attached"),
+      ),
       conditionalPanel(
         condition = "output.genoexist == 1",
         uiOutput(outputId = "off"),
@@ -19,6 +27,7 @@ recview_ui <- function(request) {
         condition = "output.scexist == 1",
         uiOutput(outputId = "chr"),
       ),
+      hr(style="border-color: black;"),
       checkboxGroupInput(inputId = "resolution", label = "Figure resolution:", choices =  "Low", selected = "Low"),
       radioButtons(inputId = "locate", label = "Locate recombination positions?", choices =  c("Yes", "No"), selected = "No"),
       conditionalPanel(
@@ -53,7 +62,6 @@ recview_ui <- function(request) {
       actionButton(inputId = "click", "Run analysis")
     ),
     h6(),
-    #scroller::use_scroller(),
     mainPanel(width = 9,
       conditionalPanel(
         condition = "input.click > 0",
