@@ -4,14 +4,14 @@
 \alias{make_012gt_from_vcf}
 \title{Make '012'-formatted genotype file from VCF}
 \usage{
-make_012gt_from_vcf(gt, save_filename)
+make_012gt_from_vcf(gt, F0F1_rename, save_filename)
 }
 \arguments{
 \item{vcf}{VCF file of either .vcf or .vcf.gz}
 
 \item{limit}{the upper limit for reading in the file}
 
-\item{F0F1_rename}{a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother), and F1 (father, mother)}
+\item{F0F1_rename}{a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother) and F1 (father, mother); use "NA" if missing.}
 
 \item{save_filename}{the name for saving the '012'-formatted output, as .csv .}
 

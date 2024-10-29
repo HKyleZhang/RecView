@@ -4,12 +4,12 @@
 \alias{make_012gt}
 \title{Make '012'-formatted genotype file}
 \usage{
-make_012gt(gt, save_filename)
+make_012gt(gt, F0F1_rename, save_filename)
 }
 \arguments{
 \item{gt}{the output file when using vcftools to extract "GT"}
 
-\item{F0F1_rename}{a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother), and F1 (father, mother)}
+\item{F0F1_rename}{a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother) and F1 (father, mother); use "NA" if missing.}
 
 \item{save_filename}{the name for saving the '012'-formatted output, as .csv .}
 }
