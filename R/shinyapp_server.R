@@ -11,9 +11,9 @@ recview_server <- function(input, output, session) {
   }, deleteFile = FALSE)
   
   ### Files input ----
-  roots <- c("Current Working Directory" = ".", Home = fs::path_home())
-  shinyFiles::shinyFileChoose(input, id = "genofile", roots = roots, defaultRoot = "Current Working Directory", session = session, filetypes = c('', 'csv'))
-  shinyFiles::shinyFileChoose(input, id = "scfile", roots = roots, defaultRoot = "Current Working Directory", session = session, filetypes = c('', 'csv'))
+  roots <- c("Current Directory" = ".", "Upper Directory" = "..", Home = fs::path_home())
+  shinyFiles::shinyFileChoose(input, id = "genofile", roots = roots, defaultRoot = "Current Directory", session = session, filetypes = c('', 'csv'))
+  shinyFiles::shinyFileChoose(input, id = "scfile", roots = roots, defaultRoot = "Current Directory", session = session, filetypes = c('', 'csv'))
   
   output$genofile_attached <- renderUI({
     renderPrint({cat(shinyFiles::parseFilePaths(roots, input$genofile)$name)})
@@ -41,7 +41,7 @@ recview_server <- function(input, output, session) {
                   label = "Choose Offspring(s):",
                   multiple = TRUE,
                   choices = ind_id,
-                  width = "95%")
+                  width = "100%")
     }
     })
   ### Chromosome input droplist ----
@@ -61,7 +61,7 @@ recview_server <- function(input, output, session) {
                   label = "Choose Chromosome(s):",
                   multiple = TRUE,
                   choices = all_chr,
-                  width = "95%")
+                  width = "100%")
     }
   })
   
@@ -973,6 +973,7 @@ recview_server <- function(input, output, session) {
 
   ### 2.2.3 Conduct analysis ----
   rec_plot_event <- eventReactive(input$click, {
+    output$ui_out <- NULL
     if (!isFALSE(dd()) && !isFALSE(sc()) && length(ch()) > 0) {
 
       progress <- shiny::Progress$new()
