@@ -8,13 +8,13 @@ recview_ui <- function(request) {
     imageOutput("title", height = "70px", width = "383px"),
     h5("Maintainer: Hongkai Zhang"),
     sidebarPanel(width = 3,
-      shinyFiles::shinyFilesButton(id = "genofile", label = "Select genotype file", title = "Please select a file", multiple = FALSE, viewtype = "detail"),
+      shinyFiles::shinyFilesButton(id = "genofile", label = "Select genotype file", title = "Please select a file", multiple = FALSE, viewtype = "detail", buttonType = "primary btn-block"),
       conditionalPanel(
         condition = "output.genoexist == 1",
         uiOutput(outputId = "genofile_attached"),
       ),
       p(),
-      shinyFiles::shinyFilesButton(id = "scfile", label = "Select scaffold file", title = "Please select a file", multiple = FALSE, viewtype = "detail"),
+      shinyFiles::shinyFilesButton(id = "scfile", label = "Select scaffold file", title = "Please select a file", multiple = FALSE, viewtype = "detail", buttonType = "primary btn-block"),
       conditionalPanel(
         condition = "output.scexist == 1",
         uiOutput(outputId = "scfile_attached"),
@@ -39,23 +39,23 @@ recview_ui <- function(request) {
         radioButtons(inputId = "algorithm", label = "Algorithm:", choices = c("PD", "CCS"), selected = "CCS"),
         conditionalPanel(
           condition = "input.algorithm == 'PD'",
-          textInput(inputId = "radius", label = "Radius", width = "95%", placeholder = "default: 550")
+          textInput(inputId = "radius", label = "Radius", width = "100%", placeholder = "default: 550")
         ),
         conditionalPanel(
           condition = "input.algorithm == 'PD'",
-          textInput(inputId = "step", label = "Step", width = "95%", placeholder = "default: 17")
+          textInput(inputId = "step", label = "Step", width = "100%", placeholder = "default: 17")
         ),
         conditionalPanel(
           condition = "input.algorithm == 'PD'",
-          textInput(inputId = "finer_step", label = "Finer step", width = "95%", placeholder = "default: 1")
+          textInput(inputId = "finer_step", label = "Finer step", width = "100%", placeholder = "default: 1")
         ),
         conditionalPanel(
           condition = "input.algorithm == 'PD'",
-          textInput(inputId = "pd_threshold", label = "Threshold to initiate finer step", width = "95%", placeholder = "default: 0.9")
+          textInput(inputId = "pd_threshold", label = "Threshold to initiate finer step", width = "100%", placeholder = "default: 0.9")
         ),
         conditionalPanel(
           condition = "input.algorithm == 'CCS'",
-          textInput(inputId = "threshold", label = "Threshold value", width = "95%", placeholder = "default: 50")
+          textInput(inputId = "threshold", label = "Threshold value", width = "100%", placeholder = "default: 50")
         ),
         checkboxGroupInput(inputId = "save_opt2", label = "Saving options", choices = c("GoO Inferences", "Plots", "Locations"))
       ),
