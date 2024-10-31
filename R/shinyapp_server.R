@@ -54,7 +54,7 @@ recview_server <- function(input, output, session) {
   
   output$chr <- renderUI({
     if(!is.integer(input$scfile)) {
-      all_chr <- read_csv(shinyFiles::parseFilePaths(roots, input$scfile)$datapath, col_types = cols(CHR = col_character())) %>% 
+      all_chr <- read_csv(shinyFiles::parseFilePaths(roots, input$scfile)$datapath, col_types = cols(CHR = col_character()), progress = FALSE) %>% 
         pull(CHR) %>% 
         str_sort(numeric = T)
       selectInput(inputId = "chr",
@@ -68,7 +68,7 @@ recview_server <- function(input, output, session) {
   ### Show the result of which chromosome droplist ----
   output$show_chr <- renderUI({
     if(!is.integer(input$scfile)) {
-      all_chr <- read_csv(shinyFiles::parseFilePaths(roots, input$scfile)$datapath, col_types = cols(CHR = col_character())) %>% 
+      all_chr <- read_csv(shinyFiles::parseFilePaths(roots, input$scfile)$datapath, col_types = cols(CHR = col_character()), progress = FALSE) %>% 
         pull(CHR) %>% 
         str_sort(numeric = T) %>% 
         unique()
@@ -706,6 +706,12 @@ recview_server <- function(input, output, session) {
     location <- tb$location %>% unique()
     algorithm <- tb$algorithm %>% unique()
     threshold <- tb$threshold %>% unique()
+    
+    num_informative <- res[[1]] %>% 
+      group_by(Side) %>% 
+      tally() %>% 
+      mutate(y = 1.5)
+    num_informative$y[which(num_informative == "Paternal")] <- 3.5
 
     if (max(res[[1]]$POS_chr_mb) > 15) {
       break_step <- 10
@@ -744,13 +750,14 @@ recview_server <- function(input, output, session) {
         scattermore::geom_scattermore(aes(x = POS_chr_mb, y = Grandparent_of_origin_value, color = scaffold_orientation),
                                       pointsize = point_size, position = position_jitter(height = 0.2), pixels = c(1500, 264)) +
         scattermore::geom_scattermore(data = ex_tb, aes(x = POS_chr_mb, y = Grandparent_of_origin_value), alpha = 0,
-                                      pointsize = 0, pixels = c(1500, 264))
+                                      pointsize = 0, pixels = c(1500, 264)) +
+        geom_label(data = num_informative, aes(x = max(res[[1]]$POS_chr_mb)*0.92, y = y, label = paste0("n = ", n)), alpha = 1, color = "black")
     } else {
       p1 <- ggplot(data = res[[1]]) +
         geom_point(aes(x = POS_chr_mb, y = Grandparent_of_origin_value, color = scaffold_orientation),
                    size = 0.1, position = position_jitter(height = 0.2)) +
-        geom_point(data = ex_tb, aes(x = POS_chr_mb, y = Grandparent_of_origin_value), alpha = 0,
-                                      size = 0)
+        geom_point(data = ex_tb, aes(x = POS_chr_mb, y = Grandparent_of_origin_value), alpha = 0, size = 0) +
+        geom_label(data = num_informative, aes(x = max(res[[1]]$POS_chr_mb)*0.92, y = y, label = paste0("n = ", n)), alpha = 1, color = "black")
     }
     p1 <- p1 + scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step),
                                   limits = c(-max(res[[1]]$POS_chr_mb)*0.01, max(res[[1]]$POS_chr_mb)*1.01), 
@@ -999,7 +1006,7 @@ recview_server <- function(input, output, session) {
           str_split_1(pattern = ",") %>% 
           as.numeric()
         
-        header <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 1, col_types = cols()) %>% colnames()
+        header <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 1, col_types = cols(), progress = FALSE) %>% colnames()
         laf <- LaF::laf_open_csv(filename = shinyFiles::parseFilePaths(roots, input$genofile)$datapath, column_types = c(rep("character", 2), "numeric", rep("character", 2), rep("numeric", length(header) - 5)), column_names = header, skip = 1)
         dd_in <- laf[read_rows,] %>% 
           `colnames<-`(.,header)
