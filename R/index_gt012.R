@@ -19,7 +19,7 @@ index_gt012 <- function(gt012_file, scaffold_file) {
   
   chr_list <- list()
   for (i in seq(1, num_rows, 1e4)) {
-    chr_list[[length(chr_list)+1]] <- next_block(laf, nrows = 1e4) %>%
+    chr_list[[length(chr_list)+1]] <- LaF::next_block(laf, nrows = 1e4) %>%
       mutate(row = i + seq(1,nrow(.)) - 1) %>%
       select(V2, row) %>%
       left_join(sc %>% select(scaffold, CHR), by = c("V2" = "scaffold")) %>%
