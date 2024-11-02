@@ -12,7 +12,7 @@ This R package is designed to distribute the *RecView* ShinyApp which aims at pr
 
 ## Installation
 
-`remotes::install_github("HKyleZhang/RecView")`
+`devtools::install_github("HKyleZhang/RecView@v1.0.0")`
 
 -   Installation will install these dependencies:
     -   shiny (\>= 1.7.1)
