@@ -30,7 +30,7 @@ recview_server <- function(input, output, session) {
     }
   })
   outputOptions(output, 'genoexist', suspendWhenHidden=FALSE)
-
+  
   output$off <- renderUI({
     if(!is.integer(input$genofile)) {
       all_columns <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 1, col_types = cols(), progress = FALSE) %>%
@@ -43,7 +43,7 @@ recview_server <- function(input, output, session) {
                   choices = ind_id,
                   width = "100%")
     }
-    })
+  })
   ### Chromosome input droplist ----
   output$scexist <- reactive({
     if(!is.integer(input$scfile)) {
@@ -139,8 +139,8 @@ recview_server <- function(input, output, session) {
   sop2 <- reactive({input$save_opt2})
   ### Chromosome visualisation setting ----
   show_ch <- reactive({req(input$show_chr)})
-
-
+  
+  
   ## 2.2 Main ----
   ### 2.2.1 Function to analyse recombination locations ----
   rec_analyse <- function(data, sc_order, chromosome, offspring, loc, alg, thrsd, radius, step, finer_step, finer_threshold) {
@@ -234,7 +234,7 @@ recview_server <- function(input, output, session) {
       filter(CHR == !!chromosome) %>%
       arrange(order) %>%
       mutate(accumulated_size = 0)
-
+    
     if (nrow(chr) == 1) {
       chr$accumulated_size[1] <- 0
     } else if (nrow(chr) > 1) {
@@ -242,43 +242,44 @@ recview_server <- function(input, output, session) {
         chr$accumulated_size[i] <- sum(chr$size[1:(i-1)])
       }
     }
-
+    
     dd_ind_chr <- semi_join(dd_ind, chr, by = c("CHROM" = "scaffold")) %>%
       left_join(chr %>% select(scaffold, size, orientation, accumulated_size), by = c("CHROM" = "scaffold")) %>%
       mutate(scaffold_orientation = paste0(CHROM, ' ', orientation))
     dd_ind_chr <- dd_ind_chr %>% arrange(factor(CHROM, levels = chr$scaffold))
-
+    
     dd_ind_chr_minus <- dd_ind_chr %>%
       filter(orientation == "-") %>%
       mutate(POS_chr = accumulated_size + size - POS) %>%
       select(POS_chr, everything())
-
+    
     dd_ind_chr_plus <- dd_ind_chr %>%
       filter(orientation == "+") %>%
       mutate(POS_chr = accumulated_size + POS) %>%
       select(POS_chr, everything())
-
+    
     dd_ind_chr <- bind_rows(dd_ind_chr_minus, dd_ind_chr_plus)
-
+    
     res_raw <- dd_ind_chr %>%
       select(POS_chr, CHROM, scaffold_orientation, Paternal, Maternal) %>%
       arrange(POS_chr)
-
+    
     res_par <- res_raw %>%
       select(POS_chr, CHROM, scaffold_orientation, Paternal) %>%
       `colnames<-`(., c("POS_chr", "CHROM", "scaffold_orientation", "Grandparent_of_origin")) %>%
       filter(Grandparent_of_origin != "N") %>%
       mutate(Grandparent_of_origin_value = NaN, Side = "Paternal")
-
+    
     res_mar <- res_raw %>%
       select(POS_chr, CHROM, scaffold_orientation, Maternal) %>%
       `colnames<-`(., c("POS_chr", "CHROM", "scaffold_orientation", "Grandparent_of_origin")) %>%
       filter(Grandparent_of_origin != "N") %>%
       mutate(Grandparent_of_origin_value = NaN, Side = "Maternal")
-
+    
     case <- 0
     if (nrow(res_par) == 0) case <- 1
     if (nrow(res_mar) == 0) case <- 2
+    if (nrow(res_par) == 0 && nrow(res_mar) == 0) case <- 3
     
     res <- list()
     res[[1]] <- bind_rows(res_par, res_mar) %>%
@@ -287,10 +288,10 @@ recview_server <- function(input, output, session) {
              Grandparent_of_origin_value = if_else(Grandparent_of_origin == "B", 2, Grandparent_of_origin_value),
              Grandparent_of_origin_value = if_else(Grandparent_of_origin == "A", 3, Grandparent_of_origin_value),
              POS_chr_mb = POS_chr/1e6)
-
+    
     res[[1]]$Side <- factor(res[[1]]$Side, levels = c("Paternal", "Maternal"))
     res[[1]]$scaffold_orientation <- factor(res[[1]]$scaffold_orientation, levels = unique(res[[1]]$scaffold_orientation))
-
+    
     #### Automatic detection of recombination location ----
     if (loc == "Yes") {
       if (alg == "PD") {
@@ -304,7 +305,7 @@ recview_server <- function(input, output, session) {
         find_local_maxima <- function(tb) {
           tb[which(tb$diff == max(tb$diff)),]
         }
-
+        
         goo_proportion <- function(input, tb, side, symbol) {
           tb <- tb[input$seg_start[1]:input$seg_end[1],]
           n <- tb %>% filter(get(side, tb) == !!symbol) %>% nrow()
@@ -333,17 +334,21 @@ recview_server <- function(input, output, session) {
         
         running_difference <- function(tb, radius, step, finer_step = 1, finer_threshold = 0.95, side, symbol) {
           snp <- nrow(tb)
-          cut_point <- seq(1, snp - radius * 2, step) + radius
-          seg_1_proportion <- tibble(cut_point = cut_point, seg_start = cut_point - radius, seg_end = cut_point - 1) %>% 
-            nest(input = !cut_point) %>% 
-            mutate(p_1 = map(input, goo_proportion, tb, side, symbol)) %>% 
-            unnest(cols = c("input", "p_1"))
-          seg_2_proportion <- tibble(cut_point = cut_point, seg_start = cut_point, seg_end = cut_point + radius - 1) %>% 
-            nest(input = !cut_point) %>% 
-            mutate(p_2 = map(input, goo_proportion, tb, side, symbol)) %>% 
-            unnest(cols = c("input", "p_2"))
-          segment_goo_proportion_diff <- inner_join(seg_1_proportion, seg_2_proportion, by = "cut_point") %>% 
-            mutate(diff = abs(p_1 - p_2))
+          if ((snp - radius * 2) > 1) {
+            cut_point <- seq(1, snp - radius * 2, step) + radius
+            seg_1_proportion <- tibble(cut_point = cut_point, seg_start = cut_point - radius, seg_end = cut_point - 1) %>% 
+              nest(input = !cut_point) %>% 
+              mutate(p_1 = map(input, goo_proportion, tb, side, symbol)) %>% 
+              unnest(cols = c("input", "p_1"))
+            seg_2_proportion <- tibble(cut_point = cut_point, seg_start = cut_point, seg_end = cut_point + radius - 1) %>% 
+              nest(input = !cut_point) %>% 
+              mutate(p_2 = map(input, goo_proportion, tb, side, symbol)) %>% 
+              unnest(cols = c("input", "p_2"))
+            segment_goo_proportion_diff <- inner_join(seg_1_proportion, seg_2_proportion, by = "cut_point") %>% 
+              mutate(diff = abs(p_1 - p_2))
+          } else {
+            segment_goo_proportion_diff <- tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric())
+          }
           
           rows_above_thrshd <- seqle_mod(which(segment_goo_proportion_diff$diff >= finer_threshold)) %>% 
             discard(is.na)
@@ -356,62 +361,63 @@ recview_server <- function(input, output, session) {
               select(output, local_maxima)
           } else {
             segment_goo_proportion_finer <- tibble(output = tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric()),
-                                                  local_maxima = tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric()))
+                                                   local_maxima = tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric()))
           }
           
           out <- list(segment_goo_proportion_diff, segment_goo_proportion_finer)
           return(out)
         }
-
+        
         dd_pat <- res_raw %>% filter(Paternal != "N")
         dd_mat <- res_raw %>% filter(Maternal != "N")
-
+        
         if (nrow(dd_pat) > 0) {
           dd_pat_mod <- running_difference(tb = dd_pat, radius = radius, step = step, finer_step = finer_step, finer_threshold = finer_threshold, side = "Paternal", symbol = "A")
+          dd_pat_mod_local_maxima <- dd_pat_mod[[2]] %>% 
+            select(local_maxima) %>% 
+            unnest(cols = "local_maxima") %>% 
+            mutate(Side = "Paternal", POS_chr = dd_pat$POS_chr[.$cut_point]) %>%
+            mutate(POS_chr_mb = POS_chr/1e6) %>% 
+            select(Side, POS_chr, POS_chr_mb, diff)
+          
+          if (nrow(dd_pat_mod_local_maxima) == 0) dd_pat_mod_local_maxima <- tibble(Side = "Paternal", POS_chr = "-", POS_chr_mb = "-", diff = "-")
         } else {
           dd_pat_mod <- list()
           dd_pat_mod[[1]] <- tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric())
           dd_pat_mod[[2]] <- tibble(output = tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric()))
+          dd_pat_mod_local_maxima <- tibble(Side = "Paternal", POS_chr = "-", POS_chr_mb = "-", diff = "-")
         }
         if (nrow(dd_mat) > 0) {
           dd_mat_mod <- running_difference(tb = dd_mat, radius = radius, step = step, finer_step = finer_step, finer_threshold = finer_threshold, side = "Maternal", symbol = "C")
+          dd_mat_mod_local_maxima <- dd_mat_mod[[2]] %>% 
+            select(local_maxima) %>% 
+            unnest(cols = "local_maxima") %>% 
+            mutate(Side = "Maternal", POS_chr = dd_mat$POS_chr[.$cut_point]) %>% 
+            mutate(POS_chr_mb = POS_chr/1e6) %>% 
+            select(Side, POS_chr, POS_chr_mb, diff)
+          
+          if (nrow(dd_mat_mod_local_maxima) == 0) dd_mat_mod_local_maxima <- tibble(Side = "Maternal", POS_chr = "-", POS_chr_mb = "-", diff = "-")
         } else {
           dd_mat_mod <- list()
           dd_mat_mod[[1]] <- tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric())
           dd_mat_mod[[2]] <- tibble(output = tibble(cut_point = as.numeric(), seg_start.x = as.numeric(), seg_end.x= as.numeric(), p_1 = as.numeric(), seg_start.y = as.numeric(), seg_end.y = as.numeric(), p_2 = as.numeric(), diff = as.numeric()))
+          dd_mat_mod_local_maxima <- tibble(Side = "Maternal", POS_chr = "-", POS_chr_mb = "-", diff = "-")
         }
         
         dd_pat_mod_ <- bind_rows(dd_pat_mod[[1]], dd_pat_mod[[2]] %>% select(output) %>% unnest(cols = "output")) %>% 
           mutate(Side = "Paternal", POS_chr = dd_pat$POS_chr[.$cut_point])
         dd_mat_mod_ <- bind_rows(dd_mat_mod[[1]], dd_mat_mod[[2]] %>% select(output) %>% unnest(cols = "output")) %>% 
           mutate(Side = "Maternal", POS_chr = dd_mat$POS_chr[.$cut_point])
-
+        
         res[[2]] <- bind_rows(dd_pat_mod_, dd_mat_mod_) %>% 
           distinct(Side, POS_chr, diff) %>% 
           mutate(POS_chr_mb = POS_chr/1e6)
         res[[2]]$Side <- factor(res[[2]]$Side, levels = c("Paternal", "Maternal"))
         
-        dd_pat_mod_local_maxima <- dd_pat_mod[[2]] %>% 
-          select(local_maxima) %>% 
-          unnest(cols = "local_maxima") %>% 
-          mutate(Side = "Paternal", POS_chr = dd_pat$POS_chr[.$cut_point])
-        dd_mat_mod_local_maxima <- dd_mat_mod[[2]] %>% 
-          select(local_maxima) %>% 
-          unnest(cols = "local_maxima") %>% 
-          mutate(Side = "Maternal", POS_chr = dd_mat$POS_chr[.$cut_point])
-        
         res[[3]] <- rbind(dd_pat_mod_local_maxima, dd_mat_mod_local_maxima) %>%
-          distinct(Side, POS_chr, diff) %>% 
-          mutate(POS_chr_mb = POS_chr/1e6)
+          distinct(Side, POS_chr, diff)
         res[[3]]$Side <- factor(res[[3]]$Side, levels = c("Paternal", "Maternal"))
         
-        if (nrow(res[[3]]) == 0) {
-          res[[3]] <- tibble(Side = c("Paternal", "Maternal"),
-                             POS_chr = c("-", "-"),
-                             POS_chr_mb = c("-", "-"),
-                             diff = c("-", "-"))
-        }
-
         res1_mod <- res[[1]] %>% select(POS_chr, scaffold_orientation)
         res1_mod$POS_chr <- as.character(res1_mod$POS_chr)
         res1_mod$scaffold_orientation <- as.character(res1_mod$scaffold_orientation)
@@ -420,7 +426,7 @@ recview_server <- function(input, output, session) {
           select(Side, scaffold_orientation, everything()) %>%
           replace_na(list(scaffold_orientation = "-")) %>%
           `colnames<-`(.,c("Origin", "Scaffold & Orientation", "Chromosomal position (bp)", "Chromosomal position (Mb)", "Abs. GoO prop. diff."))
-
+        
       } else if (alg == "CCS") {
         check_continuity <- function(tb, side) {
           tb <- tb %>%
@@ -429,9 +435,9 @@ recview_server <- function(input, output, session) {
           if (nrow(tb) != 0) {
             tb <- tb %>%
               mutate(goo_minus = c(0, .$Grandparent_of_origin[1:(length(.$Grandparent_of_origin)-1)]))
-  
+            
             similarity <- ifelse(tb$Grandparent_of_origin == tb$goo_minus, 1, 0)
-  
+            
             zeros <- which(similarity == 0)
             sepa <- list()
             if (zeros[length(zeros)] != nrow(tb)) {
@@ -441,13 +447,13 @@ recview_server <- function(input, output, session) {
               sepa[[1]] <- zeros
               sepa[[2]] <- "excl"
             }
-  
+            
             if (sepa[[2]] == "incl") {
               tb_zero <- tb[sepa[[1]][1:(length(sepa[[1]])-1)],] %>% mutate(continuity = 0, abs_cumulative_continuity = 0)
             } else {
               tb_zero <- tb[sepa[[1]][1:length(sepa[[1]])],] %>% mutate(continuity = 0, abs_cumulative_continuity = 0)
             }
-  
+            
             tb_list <- list()
             i <- 1
             for (j in 2:length(sepa[[1]])) {
@@ -468,7 +474,7 @@ recview_server <- function(input, output, session) {
                 i <- i + 1
               }
             }
-  
+            
             tb <- reduce(tb_list, bind_rows) %>%
               bind_rows(tb_zero) %>%
               arrange(POS_chr) %>%
@@ -479,16 +485,16 @@ recview_server <- function(input, output, session) {
           
           return(tb)
         }
-
+        
         backtrack_position <- function(tb, threshold) {
           tb <- tb %>%
             mutate(index = seq(1:nrow(.))) %>%
             select(POS_chr, POS_chr_mb, continuity, abs_cumulative_continuity, index)
-
+          
           tb_1 <- tb %>%
             filter(tb$continuity == threshold | tb$continuity == -threshold) %>%
             arrange(POS_chr)
-
+          
           tb_2 <- list()
           if (nrow(tb_1) > 1) {
             k <- 1
@@ -499,33 +505,33 @@ recview_server <- function(input, output, session) {
               }
             }
           }
-
+          
           rows_retrieve <- function(x, threshold, tb) {
             x <- x %>% arrange(POS_chr)
             t_index_1 <- x$abs_cumulative_continuity[1] - threshold + x$index[1]
             t_index_2 <- x$index[2] - threshold
-
+            
             t_row_1 <- tb %>% filter(index == t_index_1)
             t_row_2 <- tb %>% filter(index == t_index_2)
-
+            
             out <- tibble(POS_chr = round(mean(c(t_row_1$POS_chr, t_row_2$POS_chr))), Left_boundary = t_row_1$POS_chr, Right_boundary = t_row_2$POS_chr)
             return(out)
           }
-
+          
           if (length(tb_2) > 0) {
             out <- lapply(tb_2, rows_retrieve, threshold = threshold, tb = tb) %>%
               reduce(bind_rows)
           } else {
             out <- tibble(POS_chr = as.numeric(), Left_boundary = as.numeric(), Right_boundary= as.numeric())
           }
-
+          
           return(out)
         }
-
+        
         tb_pat <- check_continuity(res[[1]], side = "Paternal")
         tb_mat <- check_continuity(res[[1]], side = "Maternal")
         res[[2]] <- bind_rows(tb_pat, tb_mat)
-
+        
         if (nrow(tb_pat) != 0) {
           tb_pat_mod <- backtrack_position(tb_pat, threshold = thrsd)
           if (nrow(tb_pat_mod) != 0) {
@@ -550,7 +556,7 @@ recview_server <- function(input, output, session) {
         tb_pat_mod$POS_chr_mb <- as.character(tb_pat_mod$POS_chr_mb)
         tb_pat_mod$Left_boundary <- as.character(tb_pat_mod$Left_boundary)
         tb_pat_mod$Right_boundary <- as.character(tb_pat_mod$Right_boundary)
-
+        
         if (nrow(tb_mat) != 0) {
           tb_mat_mod <- backtrack_position(tb_mat, threshold = thrsd)
           if (nrow(tb_mat_mod) != 0) {
@@ -575,7 +581,7 @@ recview_server <- function(input, output, session) {
         tb_mat_mod$POS_chr_mb <- as.character(tb_mat_mod$POS_chr_mb)
         tb_mat_mod$Left_boundary <- as.character(tb_mat_mod$Left_boundary)
         tb_mat_mod$Right_boundary <- as.character(tb_mat_mod$Right_boundary)
-
+        
         res[[3]] <- bind_rows(tb_pat_mod, tb_mat_mod) %>%
           unite(col = "id", c("Origin", "Right_boundary"), remove = FALSE)
         res1_mod <- res[[1]] %>% select(POS_chr, Side, scaffold_orientation) %>%
@@ -586,19 +592,19 @@ recview_server <- function(input, output, session) {
           select(Origin, scaffold_orientation, everything()) %>%
           replace_na(list(scaffold_orientation = "-")) %>%
           `colnames<-`(.,c("Origin", "Scaffold & Orientation", "Chromosomal position (bp)", "Chromosomal position (Mb)", "Left boundary (bp)", "Right boundary (bp)"))
-
+        
       }
       res[[3]]$Origin <- factor(res[[3]]$Origin, levels = c("Paternal", "Maternal"))
     }
-
+    
     #### Informative SNP density ----
     interval <- 1e5
     digits <- floor(log10(interval)) + 1
-    if (case != 1) {
+    if (case != 1 && case != 3) {
       breaks_pat <- seq(0, ceiling(max(get("POS_chr", res[[1]] %>% filter(Side == "Paternal")))/10^digits) * 10^digits, interval)
       hist_pat <- hist(get("POS_chr", res[[1]] %>% filter(Side == "Paternal")), breaks = breaks_pat, plot = F)
       max_break <- max(hist_pat$breaks)
-
+      
       snp_density_pat <- tibble(POS_chr = hist_pat$mids[1:length(hist_pat$mids)],
                                 breaks = hist_pat$breaks[1:(length(hist_pat$breaks)-1)],
                                 Counts = hist_pat$counts[1:length(hist_pat$counts)]) %>%
@@ -607,16 +613,16 @@ recview_server <- function(input, output, session) {
                POS_chr_mb = POS_chr / 1e6,
                Side = "Paternal")
     } else {
-      snp_density_pat <- tibble(POS_chr = NA, breaks = NA, Counts = NA,
-                                Density = NA, Precision = NA, POS_chr_mb = NA,
+      snp_density_pat <- tibble(POS_chr = 0, breaks = NA, Counts = NA,
+                                Density = NA, Precision = NA, POS_chr_mb = 0,
                                 Side = "Paternal")
     }
-
-    if (case != 2) {
+    
+    if (case != 2 && case != 3) {
       breaks_mat <- seq(0, ceiling(max(get("POS_chr", res[[1]] %>% filter(Side == "Maternal")))/10^digits) * 10^digits, interval)
       hist_mat <- hist(get("POS_chr", res[[1]] %>% filter(Side == "Maternal")), breaks = breaks_mat, plot = F)
       max_break <- max(hist_mat$breaks)
-
+      
       snp_density_mat <- tibble(POS_chr = hist_mat$mids[1:length(hist_mat$mids)],
                                 breaks = hist_mat$breaks[1:(length(hist_mat$breaks)-1)],
                                 Counts = hist_mat$counts[1:length(hist_mat$counts)]) %>%
@@ -625,59 +631,63 @@ recview_server <- function(input, output, session) {
                POS_chr_mb = POS_chr / 1e6,
                Side = "Maternal")
     } else {
-      snp_density_mat <- tibble(POS_chr = NA, breaks = NA, Counts = NA,
-                                Density = NA, Precision = NA, POS_chr_mb = NA,
+      snp_density_mat <- tibble(POS_chr = 0, breaks = NA, Counts = NA,
+                                Density = NA, Precision = NA, POS_chr_mb = 0,
                                 Side = "Maternal")
     }
-
-    res[[4]] <- rbind(snp_density_pat, snp_density_mat) %>%
-      mutate(Precision = na_if(Precision, Inf))
+    
+    if (case != 3) {
+      res[[4]] <- rbind(snp_density_pat, snp_density_mat) %>%
+        mutate(Precision = na_if(Precision, Inf))
+    } else {
+      max_break <- 0
+      res[[4]] <- rbind(snp_density_pat, snp_density_mat)
+    }
     res[[4]]$Side <- factor(res[[4]]$Side, levels = c("Paternal", "Maternal"))
-
-
+    
+    
     if (loc == "Yes") {
-       left <- get("breaks", res[[4]]) %>% unique() %>% .[1:length(.)]
-       right <- c(get("breaks", res[[4]]) %>% unique() %>% .[2:length(.)],
-                  max_break)
-
-       intervals_retrieve <- function(x, tb) {
-         side <- x$Origin
-         if (x$`Chromosomal position (bp)` != '-') {
+      left <- get("breaks", res[[4]]) %>% unique() %>% .[1:length(.)]
+      right <- c(get("breaks", res[[4]]) %>% unique() %>% .[2:length(.)],
+                 max_break)
+      
+      intervals_retrieve <- function(x, tb) {
+        side <- x$Origin
+        if (x$`Chromosomal position (bp)` != '-') {
           left_boolean <- as.numeric(x$`Chromosomal position (bp)`) >= left
           right_boolean <- as.numeric(x$`Chromosomal position (bp)`) < right
           boolean <- which((left_boolean & right_boolean) == TRUE)
-
+          
           ee <- tb %>%
             filter(Side == side) %>%
             .[boolean,] %>%
             get("Precision",.) %>%
             round()
-
-         } else {
-           ee = "-"
-         }
-         out <- x %>%
-           mutate(Esimated_error = ee)
-         out$Esimated_error <- as.character(out$Esimated_error)
-         return(out)
-       }
-
-       res[[3]] <- res[[3]] %>%
-         mutate(index = seq(1:nrow(.))) %>%
-         nest(input = !index) %>%
-         mutate(output = map(input, intervals_retrieve, tb = res[[4]])) %>%
-         select(-input) %>%
-         unnest(cols = "output") %>%
-         select(-index) %>%
-         select(Origin, `Scaffold & Orientation`, `Chromosomal position (bp)`, Esimated_error, `Chromosomal position (Mb)`, everything()) %>%
-         `colnames<-`(.,c("Origin", "Scaffold & Orientation", "Chromosomal position (bp)",
-                          "Precision (bp)", "Chromosomal position (Mb)", colnames(res[[3]])[5:length(colnames(res[[3]]))]))
-
+          
+        } else {
+          ee = "-"
+        }
+        out <- x %>%
+          mutate(Esimated_error = ee)
+        out$Esimated_error <- as.character(out$Esimated_error)
+        return(out)
+      }
+      
+      res[[3]] <- res[[3]] %>%
+        mutate(index = seq(1:nrow(.))) %>%
+        nest(input = !index) %>%
+        mutate(output = map(input, intervals_retrieve, tb = res[[4]])) %>%
+        select(-input) %>%
+        unnest(cols = "output") %>%
+        select(-index) %>%
+        select(Origin, `Scaffold & Orientation`, `Chromosomal position (bp)`, Esimated_error, `Chromosomal position (Mb)`, everything()) %>%
+        `colnames<-`(.,c("Origin", "Scaffold & Orientation", "Chromosomal position (bp)",
+                         "Precision (bp)", "Chromosomal position (Mb)", colnames(res[[3]])[5:length(colnames(res[[3]]))]))
     }
-
+    
     return(res)
   }
-
+  
   ### 2.2.2 Function to plot results ----
   rec_plot_0 <- function(tb) {
     res <- tb$res
@@ -687,17 +697,17 @@ recview_server <- function(input, output, session) {
     location <- tb$location %>% unique()
     algorithm <- tb$algorithm %>% unique()
     threshold <- tb$threshold %>% unique()
-
+    
     p0 <- res[[1]] %>%
       mutate(Chromosome = chromosome,
              Offspring = offspring) %>%
       select(Offspring, Chromosome, Side, POS_chr, scaffold_orientation, Grandparent_of_origin) %>%
       `colnames<-`(.,c("Offspring", "Chromosome", "Origin", "Position", "Scaffold_Orientation", "Grandparent-of-origin"))
-
+    
     return(p0)
   }
-
-
+  
+  
   rec_plot_1 <- function(tb) {
     res <- tb$res
     chromosome <- tb$chromosome %>% unique()
@@ -711,18 +721,26 @@ recview_server <- function(input, output, session) {
       group_by(Side) %>% 
       tally() %>% 
       mutate(y = 1.5)
+    if(!("Paternal" %in% num_informative$Side)) num_informative <- add_row(num_informative, Side = "Paternal", y = 1.5, n = 0)
+    if (!("Maternal" %in% num_informative$Side)) num_informative <- add_row(num_informative, Side = "Maternal", y = 1.5, n = 0)
     num_informative$y[which(num_informative == "Paternal")] <- 3.5
-
-    if (max(res[[1]]$POS_chr_mb) > 15) {
+    num_informative$Side <- factor(num_informative$Side, levels = c("Paternal", "Maternal"))
+    
+    if (nrow(res[[1]]) == 0) {
+      x_axis_max <- 0
+    } else {
+      x_axis_max <- max(res[[1]]$POS_chr_mb)
+    }
+    if (x_axis_max > 15) {
       break_step <- 10
-    } else if (max(res[[1]]$POS_chr_mb) > 5) {
+    } else if (x_axis_max > 5) {
       break_step <- 2.5
-    } else if (max(res[[1]]$POS_chr_mb) > 2) {
+    } else if (x_axis_max > 2) {
       break_step <- 1
-    } else if (max(res[[1]]$POS_chr_mb) > 1) {
+    } else if (x_axis_max > 1) {
       break_step <- 0.25
     }
-
+    
     if (nrow(res[[1]]) < 2000) {
       point_size <- 6
     } else {
@@ -742,8 +760,8 @@ recview_server <- function(input, output, session) {
     for (i in 1:length(macaron_mod_light)) {
       colour_scheme <- c(colour_scheme, macaron_mod[i], macaron_mod_light[i])
     }
-
-    ex_tb <- tibble(POS_chr_mb = 0, Grandparent_of_origin_value = -0.13, Side = "Maternal")
+    
+    ex_tb <- tibble(POS_chr_mb = c(0, 0, 0, 0), Grandparent_of_origin_value = c(1.87, 3.13, -0.13, 1.13), Side = c("Paternal", "Paternal", "Maternal", "Maternal"))
     ex_tb$Side <- factor(ex_tb$Side, levels = c("Paternal", "Maternal"))
     if (resolution == "Low") {
       p1 <- ggplot(data = res[[1]]) +
@@ -751,16 +769,16 @@ recview_server <- function(input, output, session) {
                                       pointsize = point_size, position = position_jitter(height = 0.2), pixels = c(1500, 264)) +
         scattermore::geom_scattermore(data = ex_tb, aes(x = POS_chr_mb, y = Grandparent_of_origin_value), alpha = 0,
                                       pointsize = 0, pixels = c(1500, 264)) +
-        geom_label(data = num_informative, aes(x = max(res[[1]]$POS_chr_mb)*0.92, y = y, label = paste0("n = ", n)), alpha = 1, color = "black")
+        geom_label(data = num_informative, aes(x = x_axis_max*0.92, y = y, label = paste0("n = ", n)), alpha = 1, color = "black")
     } else {
       p1 <- ggplot(data = res[[1]]) +
         geom_point(aes(x = POS_chr_mb, y = Grandparent_of_origin_value, color = scaffold_orientation),
                    size = 0.1, position = position_jitter(height = 0.2)) +
         geom_point(data = ex_tb, aes(x = POS_chr_mb, y = Grandparent_of_origin_value), alpha = 0, size = 0) +
-        geom_label(data = num_informative, aes(x = max(res[[1]]$POS_chr_mb)*0.92, y = y, label = paste0("n = ", n)), alpha = 1, color = "black")
+        geom_label(data = num_informative, aes(x = x_axis_max*0.92, y = y, label = paste0("n = ", n)), alpha = 1, color = "black")
     }
-    p1 <- p1 + scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step),
-                                  limits = c(-max(res[[1]]$POS_chr_mb)*0.01, max(res[[1]]$POS_chr_mb)*1.01), 
+    p1 <- p1 + scale_x_continuous(breaks = seq(0, x_axis_max, break_step),
+                                  limits = c(-x_axis_max*0.01, x_axis_max*1.01), 
                                   expand = c(0,0)) +
       labs(x = "Chromosomal position (Mb)",
            y = "Grandparent-of-origin",
@@ -786,10 +804,10 @@ recview_server <- function(input, output, session) {
             axis.title = element_text(size = 20, face = "bold", color = "black"),
             strip.text = element_text(size = 16, color = "black"),
             strip.background = element_rect(fill = "grey90", color = "grey10", linewidth = 1))
-
+    
     return(p1)
   }
-
+  
   rec_plot_2 <- function(tb) {
     res <- tb$res
     chromosome <- tb$chromosome %>% unique()
@@ -798,26 +816,33 @@ recview_server <- function(input, output, session) {
     location <- tb$location %>% unique()
     algorithm <- tb$algorithm %>% unique()
     threshold <- tb$threshold %>% unique()
-
-    if (max(res[[1]]$POS_chr_mb) > 15) {
+    
+    if (nrow(res[[1]]) == 0) {
+      x_axis_max <- 0
+    } else {
+      x_axis_max <- max(res[[1]]$POS_chr_mb)
+    }
+    if (x_axis_max > 15) {
       break_step <- 10
-    } else if (max(res[[1]]$POS_chr_mb) > 5) {
+    } else if (x_axis_max > 5) {
       break_step <- 2.5
-    } else if (max(res[[1]]$POS_chr_mb) > 2) {
+    } else if (x_axis_max > 2) {
       break_step <- 1
-    } else if (max(res[[1]]$POS_chr_mb) > 1) {
+    } else if (x_axis_max > 1) {
       break_step <- 0.25
     }
-
-    round_any <- function(x, accuracy, f=round) {f(x/ accuracy) * accuracy}
     
     if (algorithm == "PD") {
-      p2 <- ggplot(data = res[[2]]) +
-        geom_line(aes(x = POS_chr_mb, y = diff, group = Side), size = 0.2, color = "#C91959") +
-        geom_point(aes(x = POS_chr_mb, y = diff), size = 0.5, color = "#C91959") +
-        scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
+      ex_tb <- tibble(POS_chr_mb = c(0, 0, 0, 0), Side = c("Paternal", "Paternal",  "Maternal", "Maternal"), diff = c(0, 0, 0, 0))
+      ex_tb$Side <- factor(ex_tb$Side, levels = c("Paternal", "Maternal"))
+      
+      p2 <- ggplot() +
+        geom_line(data = res[[2]], aes(x = POS_chr_mb, y = diff, group = Side), size = 0.2, color = "#C91959", na.rm = TRUE) +
+        geom_line(data = ex_tb, aes(x = POS_chr_mb, y = diff, group = Side), size = 0.2, color = "white", na.rm = TRUE) +
+        geom_point(data = res[[2]], aes(x = POS_chr_mb, y = diff), size = 0.5, color = "#C91959") +
+        scale_x_continuous(breaks = seq(0, x_axis_max, break_step)) +
         scale_y_continuous(limits = c(-0.05,1.05), breaks = seq(0,1,0.2)) +
-        coord_cartesian(xlim = c(-max(res[[1]]$POS_chr_mb)*0.01, max(res[[1]]$POS_chr_mb)*1.01), expand = F) +
+        coord_cartesian(xlim = c(-x_axis_max*0.01, x_axis_max*1.01), expand = F) +
         facet_wrap(~Side, nrow = 2, strip.position = "right") +
         labs(x = "Chromosomal position (Mb)",
              y = "Abs. GoO prop. diff.",
@@ -836,48 +861,63 @@ recview_server <- function(input, output, session) {
       p2 <- list(p2)
     } else if (algorithm == "CCS") {
       tb <- res[[2]] %>% mutate(sign = ifelse(continuity >= 0, 1, -1))
-      
-      tb_list <- list()
-      zeros <- which(tb$continuity == 0)
-      k <- 1
-      for (i in 1:(length(zeros) - 1)) {
-        intermediate <- tb[c(zeros[i], zeros[i + 1] - 1),] %>% mutate(line_group = k)
-        
-        if(tb$abs_cumulative_continuity[zeros[i] + 1] >= threshold) {
-          intermediate <- intermediate %>% mutate(sign = prod(sign))
-        } else {
-          intermediate <- intermediate %>% mutate(sign = 2)
-        }
-        
-        tb_list[[k]] <- intermediate %>% select(Side, POS_chr_mb, sign, line_group)
-        k <- k + 1
-      }
-      
-      if(zeros[length(zeros)] != nrow(tb)) {
-        intermediate <- tb[c(zeros[length(zeros)], nrow(tb)),] %>% mutate(line_group = length(tb_list) + 1)
-        
-        if(tb$abs_cumulative_continuity[zeros[length(zeros)] + 1] >= threshold) {
-          intermediate <- intermediate %>% mutate(sign = prod(sign))
-        } else {
-          intermediate <- intermediate %>% mutate(sign = 2)
-        }
-        tb_list[[length(tb_list) + 1]] <- intermediate %>% select(Side, POS_chr_mb, sign, line_group)
-      }
-      
-      tb_list <- reduce(tb_list, bind_rows) %>% mutate(CCS = "NA")
-      tb_list$CCS[tb_list$sign == -1] <- paste0("<= -", threshold)
-      tb_list$CCS[tb_list$sign == 1] <- paste0(">= ", threshold)
-      tb_list$CCS[tb_list$sign == 2] <- paste0("< |", threshold, "|")
-      
-      tb_list$Side <- factor(tb_list$Side, levels = c("Paternal", "Maternal"))
-      tb_list$CCS <- factor(tb_list$CCS, levels = c(paste0("<= -", threshold), paste0(">= ", threshold), paste0("< |", threshold, "|")))
       cols <- setNames(c("#81BECE", "#E45545", "black"), c(paste0("<= -", threshold), paste0(">= ", threshold), paste0("< |", threshold, "|")))
       
-      p2 <- ggplot(data = tb_list) +
-        geom_line(aes(x = POS_chr_mb, y = "CCS", group = line_group, color = CCS), linewidth = 13) +
+      if (nrow(tb) >0) {
+        tb_list <- list()
+        zeros <- which(tb$continuity == 0)
+        k <- 1
+        for (i in 1:(length(zeros) - 1)) {
+          intermediate <- tb[c(zeros[i], zeros[i + 1] - 1),] %>% mutate(line_group = k)
+          
+          if(tb$abs_cumulative_continuity[zeros[i] + 1] >= threshold) {
+            intermediate <- intermediate %>% mutate(sign = prod(sign))
+          } else {
+            intermediate <- intermediate %>% mutate(sign = 2)
+          }
+          
+          tb_list[[k]] <- intermediate %>% select(Side, POS_chr_mb, sign, line_group)
+          k <- k + 1
+        }
+        
+        if(zeros[length(zeros)] != nrow(tb)) {
+          intermediate <- tb[c(zeros[length(zeros)], nrow(tb)),] %>% mutate(line_group = length(tb_list) + 1)
+          
+          if(tb$abs_cumulative_continuity[zeros[length(zeros)] + 1] >= threshold) {
+            intermediate <- intermediate %>% mutate(sign = prod(sign))
+          } else {
+            intermediate <- intermediate %>% mutate(sign = 2)
+          }
+          tb_list[[length(tb_list) + 1]] <- intermediate %>% select(Side, POS_chr_mb, sign, line_group)
+        }
+        
+        tb_list <- reduce(tb_list, bind_rows) %>% mutate(CCS = "NA")
+        tb_list$CCS[tb_list$sign == -1] <- paste0("<= -", threshold)
+        tb_list$CCS[tb_list$sign == 1] <- paste0(">= ", threshold)
+        tb_list$CCS[tb_list$sign == 2] <- paste0("< |", threshold, "|")
+        
+        tb_list$Side <- factor(tb_list$Side, levels = c("Paternal", "Maternal"))
+        tb_list$CCS <- factor(tb_list$CCS, levels = c(paste0("<= -", threshold), paste0(">= ", threshold), paste0("< |", threshold, "|")))
+        ex_tb <- tibble(POS_chr_mb = c(0, 0, 0, 0), Side = c("Paternal", "Paternal",  "Maternal", "Maternal"))
+        ex_tb$Side <- factor(ex_tb$Side, levels = c("Paternal", "Maternal"))
+        
+        p2 <- ggplot() +
+          geom_line(data = tb_list, aes(x = POS_chr_mb, y = "CCS", group = line_group, color = CCS), linewidth = 13, na.rm = TRUE) +
+          geom_line(data = ex_tb, aes(x = POS_chr_mb, y = "CCS", group = Side), color = "white", linewidth = 13, na.rm = TRUE) +
+          scale_x_continuous(breaks = seq(0, x_axis_max, break_step))
+      } else {
+        tb_list <- tibble(POS_chr_mb = c(0, 0, 0, 0, 0, 0),
+                          CCS = c(paste0("<= -", threshold), paste0("<= -", threshold), paste0(">= ", threshold), paste0(">= ", threshold), paste0("< |", threshold, "|"), paste0("< |", threshold, "|")),
+                          Side = c("Paternal", "Paternal", "Paternal", "Maternal", "Maternal", "Maternal"),
+                          line_group = c(1, 1, 2, 2, 3, 3))
+        p2 <- ggplot() +
+          geom_line(data = tb_list, aes(x = POS_chr_mb, y = "CCS", group = line_group, color = CCS), linewidth = 13, na.rm = TRUE) +
+          scale_x_continuous(breaks = seq(0, 0.1, 0.1))
+      }
+      
+      p2 <- p2 +
         facet_wrap(~Side, scales = "free_y", nrow = 2, strip.position = "right") +
-        scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
-        coord_cartesian(xlim = c(-max(res[[1]]$POS_chr_mb)*0.01, max(res[[1]]$POS_chr_mb)*1.01), expand = F) +
+        coord_cartesian(xlim = c(-x_axis_max*0.01, x_axis_max*1.01), expand = F) +
         scale_color_manual(values = cols) +
         labs(x = "Chromosomal position (Mb)", 
              title = paste0(offspring, '; Chr', chromosome)) +
@@ -900,12 +940,12 @@ recview_server <- function(input, output, session) {
               axis.ticks.y = element_blank(),
               strip.text = element_text(size = 16, color = "black"),
               strip.background = element_rect(fill = "grey90", color = "grey10", linewidth = 1))
-
+      
       p2 <- list(p2)
     }
     return(p2)
   }
-
+  
   rec_plot_3 <- function(tb) {
     res <- tb$res
     chromosome <- tb$chromosome %>% unique()
@@ -914,14 +954,14 @@ recview_server <- function(input, output, session) {
     location <- tb$location %>% unique()
     algorithm <- tb$algorithm %>% unique()
     threshold <- tb$threshold %>% unique()
-
+    
     p3 <- res[[3]] %>%
       select(-`Chromosomal position (Mb)`) %>%
       mutate(Offspring = offspring, Chromosome = chromosome) %>%
       select(Offspring, Chromosome, Origin, `Scaffold & Orientation`, `Chromosomal position (bp)`, `Precision (bp)`)
     return(p3)
   }
-
+  
   rec_plot_4 <- function(tb) {
     res <- tb$res
     chromosome <- tb$chromosome %>% unique()
@@ -930,25 +970,32 @@ recview_server <- function(input, output, session) {
     location <- tb$location %>% unique()
     algorithm <- tb$algorithm %>% unique()
     threshold <- tb$threshold %>% unique()
-
-    if (max(res[[1]]$POS_chr_mb) > 15) {
+    
+    if (nrow(res[[1]]) == 0) {
+      x_axis_max <- 0
+    } else {
+      x_axis_max <- max(res[[1]]$POS_chr_mb)
+    }
+    if (x_axis_max > 15) {
       break_step <- 10
-    } else if (max(res[[1]]$POS_chr_mb) > 5) {
+    } else if (x_axis_max > 5) {
       break_step <- 2.5
-    } else if (max(res[[1]]$POS_chr_mb) > 2) {
+    } else if (x_axis_max > 2) {
       break_step <- 1
-    } else if (max(res[[1]]$POS_chr_mb) > 1) {
+    } else if (x_axis_max > 1) {
       break_step <- 0.25
     }
-
+    
     pat_max <- get("Density", res[[4]] %>% filter(Side == "Paternal")) %>% max()
     mat_max <- get("Density", res[[4]] %>% filter(Side == "Maternal")) %>% max()
+    if (is.na(pat_max)) pat_max <- 0
+    if (is.na(mat_max)) mat_max <- 0
     range_upper <- max(pat_max*1e5, mat_max*1e5)
-
+    
     p4 <- ggplot(data = res[[4]]) +
-      geom_line(aes(x = POS_chr_mb, y = Density*1e5, group = Side), size = 0.2) +
-      scale_x_continuous(breaks = seq(0, max(res[[1]]$POS_chr_mb), break_step)) +
-      coord_cartesian(ylim = c(-range_upper*0.1, range_upper*1.1), xlim = c(-max(res[[1]]$POS_chr_mb)*0.01, max(res[[1]]$POS_chr_mb)*1.01), expand = F) +
+      geom_line(aes(x = POS_chr_mb, y = Density*1e5, group = Side), size = 0.2, na.rm = TRUE) +
+      scale_x_continuous(breaks = seq(0, x_axis_max, break_step)) +
+      coord_cartesian(ylim = c(-range_upper*0.1, range_upper*1.1), xlim = c(-x_axis_max*0.01, x_axis_max*1.01), expand = F) +
       labs(x = "Chromosomal position (Mb)",
            y = expression(bold(atop("Density of", "informative SNPs" (''%*%"10"^"-5")))),
            title = paste0(offspring, '; Chr', chromosome)) +
@@ -963,7 +1010,7 @@ recview_server <- function(input, output, session) {
             axis.title = element_text(size = 20, face = "bold", color = "black"),
             strip.text = element_text(size = 16, color = "black"),
             strip.background = element_rect(fill = "grey90", color = "grey10", linewidth = 1))
-
+    
     # if (location == "Yes") {
     #   res3_plot <- res[[3]] %>% filter(`Chromosomal position (Mb)` != "-") %>%
     #     `colnames<-`(.,c("Side", colnames(.)[-1]))
@@ -974,19 +1021,19 @@ recview_server <- function(input, output, session) {
     #                  aes(x = `Chromosomal position (Mb)`, y = 0), pch = 23, fill = "firebrick2", size = 2.3)
     #   }
     # }
-
+    
     return(p4)
   }
-
+  
   ### 2.2.3 Conduct analysis ----
   rec_plot_event <- eventReactive(input$click, {
     output$ui_out <- NULL
     if (!isFALSE(dd()) && !isFALSE(sc()) && length(ch()) > 0) {
-
+      
       progress <- shiny::Progress$new()
       on.exit(progress$close())
       progress$set(message = "Running analysis...")
-
+      
       offspring <- of()
       for (i in 1:length(offspring)) {
         offspring[i] <- str_trim(offspring[i], side = "both")
@@ -996,7 +1043,7 @@ recview_server <- function(input, output, session) {
       for (i in 1:length(ch_in)) {
         ch_in[i] <- str_trim(ch_in[i], side = "both")
       }
-
+      
       if (file.exists(paste0(shinyFiles::parseFilePaths(roots, input$genofile)$name, ".idx"))) {
         read_rows <- read_tsv(paste0(shinyFiles::parseFilePaths(roots, input$genofile)$name, ".idx"), col_types = cols(POS = col_character()), progress = FALSE) %>% 
           filter(CHR %in% ch_in) %>% 
@@ -1012,20 +1059,20 @@ recview_server <- function(input, output, session) {
           `colnames<-`(.,header)
       } else {
         dd_in <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(Missing_ind = col_character(),
-                                                                    A = col_character(),
-                                                                    B = col_character(),
-                                                                    C = col_character(),
-                                                                    D = col_character(),
-                                                                    AB = col_character(),
-                                                                    CD = col_character()),
+                                                                                                       A = col_character(),
+                                                                                                       B = col_character(),
+                                                                                                       C = col_character(),
+                                                                                                       D = col_character(),
+                                                                                                       AB = col_character(),
+                                                                                                       CD = col_character()),
                           progress = FALSE)
       }
       
       sc_in <- read_csv(shinyFiles::parseFilePaths(roots, input$scfile)$datapath, col_types = cols(CHR = col_character(),
-                                                                order = col_double(),
-                                                                scaffold = col_character(),
-                                                                size = col_double(),
-                                                                orientation = col_character()),
+                                                                                                   order = col_double(),
+                                                                                                   scaffold = col_character(),
+                                                                                                   size = col_double(),
+                                                                                                   orientation = col_character()),
                         progress = FALSE)
       
       loc_in <- loc()
@@ -1040,7 +1087,7 @@ recview_server <- function(input, output, session) {
       } else {
         rsn_in <- rsn()
       }
-
+      
       avail_cores <- parallel::detectCores()
       if (length(offspring) <= avail_cores - 1) {
         use_cores <- length(offspring)
@@ -1071,21 +1118,21 @@ recview_server <- function(input, output, session) {
                       loc = loc_in, alg = alg_in, thrsd = thrsd_in,
                       radius = rad_in, step = stp_in, finer_step = fstp_in, finer_threshold = fthrsd_in)
         }
-
+        
         p_list <- tibble(index = seq(1:length(offspring)),
-                          chromosome = ch_in[i],
-                          offspring = offspring,
-                          res = res_list,
-                          resolution = rsn_in,
-                          location = loc_in,
-                          algorithm = alg_in,
-                          threshold = thrsd_in) %>%
+                         chromosome = ch_in[i],
+                         offspring = offspring,
+                         res = res_list,
+                         resolution = rsn_in,
+                         location = loc_in,
+                         algorithm = alg_in,
+                         threshold = thrsd_in) %>%
           unnest(cols = "res") %>%
           nest(input = !index) %>%
           mutate(fig_1 = map(input, rec_plot_1),
                  fig_4 = map(input, rec_plot_4),
                  fig_0 = map(input, rec_plot_0))
-
+        
         if (loc_in == "Yes") {
           p_list <- p_list %>%
             mutate(fig_2 = map(input, rec_plot_2),
@@ -1100,15 +1147,15 @@ recview_server <- function(input, output, session) {
       return(p_list_list)
     }
   })
-
+  
   
   #<<< Output to User Interface >>>#
   observeEvent(c(show_ch(), input$click), {
     num_off <- length(of())
     hei <- num_off * 450
-
+    
     rpe <- rec_plot_event()
-
+    
     if (length(rpe) == 1) {
       stamp <- format(Sys.time(), "%m%d%H%M")
       inference_filename <- paste0('Chromosome_', ch(), '_GoO_TimeStamp', stamp, '.csv')
@@ -1118,15 +1165,15 @@ recview_server <- function(input, output, session) {
         plot_filename <- paste0('Chromosome_', ch(), '_TimeStamp', stamp, '.pdf')
       }
       table_filename <- paste0('Chromosome_', ch(), '_', alg(), '_RecPos_TimeStamp', stamp, '.csv')
-
+      
       if (loc() == "Yes") {
         hei_mod <- 15
         wid_mod <- 15
-
+        
         if ("GoO Inferences" %in% sop2()) {
           write_csv(reduce(rpe[[1]][[5]], rbind), file = inference_filename)
         }
-
+        
         out_temp <- list()
         if ("Plots" %in% sop2()) {
           for (i in 1:length(rpe[[1]][[1]])) {
@@ -1145,19 +1192,19 @@ recview_server <- function(input, output, session) {
           
           ggpubr::ggexport(plotlist = out_temp, filename = plot_filename, verbose = FALSE, width = wid_mod, height = hei_mod)
         }
-
+        
         if ("Locations" %in% sop2()) {
           write_csv(reduce(rpe[[1]][[3]], rbind), file = table_filename)
         }
-
+        
       } else {
         hei_mod <- 9
         wid_mod <- 15
-
+        
         if ("GoO Inferences" %in% sop()) {
           write_csv(reduce(rpe[[1]][[3]], rbind), file = inference_filename)
         }
-
+        
         out_temp <- list()
         if ("Plots" %in% sop()) {
           for (i in 1:length(rpe[[1]][[1]])) {
@@ -1178,15 +1225,15 @@ recview_server <- function(input, output, session) {
           plot_filename <- paste0('Chromosome_', names(rpe)[i], '_TimeStamp', stamp, '.pdf')
         }
         table_filename <- paste0('Chromosome_', names(rpe)[i], '_', alg(), '_RecPos_TimeStamp', stamp, '.csv')
-
+        
         if (loc() == "Yes") {
           hei_mod <- 15
           wid_mod <- 15
-
+          
           if ("GoO Inferences" %in% sop2()) {
             write_csv(reduce(rpe[[i]][[5]], rbind), file = inference_filename)
           }
-
+          
           out_temp <- list()
           if ("Plots" %in% sop2()) {
             for (j in 1:length(rpe[[i]][[1]])) {
@@ -1202,22 +1249,22 @@ recview_server <- function(input, output, session) {
                                                  ggpubr::ggarrange(goo_legend_1, goo_legend_2, NULL, ncol = 1), 
                                                  ncol = 2, widths = c(10,1))
             }
-              
+            
             ggpubr::ggexport(plotlist = out_temp, filename = plot_filename, verbose = FALSE, width = wid_mod, height = hei_mod)
           }
-
+          
           if ("Locations" %in% sop2()) {
             write_csv(reduce(rpe[[i]][[3]], rbind), file = table_filename)
           }
-
+          
         } else {
           hei_mod <- 9
           wid_mod <- 15
-
+          
           if ("GoO Inferences" %in% sop()) {
             write_csv(reduce(rpe[[i]][[3]], rbind), file = inference_filename)
           }
-
+          
           out_temp <- list()
           if ("Plots" %in% sop()) {
             for (j in 1:length(rpe[[i]][[1]])) {
@@ -1230,7 +1277,7 @@ recview_server <- function(input, output, session) {
         }
       }
     }
-
+    
     recfig <- list()
     show_chr_in <- show_ch()
     if (length(rpe[[show_chr_in]]) == 3) {
@@ -1259,7 +1306,7 @@ recview_server <- function(input, output, session) {
                                          filter = 'top')
       recfig[[4]] <- renderPlot({ggpubr::ggarrange(plotlist = rpe[[show_chr_in]][[4]], ncol = 1, align = "v")}, height = hei * 0.9)
     }
-
+    
     output$ui_out <- renderUI({
       nTabs <- length(recfig)
       if (nTabs != 0) {
@@ -1279,8 +1326,7 @@ recview_server <- function(input, output, session) {
           tablist <- list(tabPanel(title = "GoO inference", plotOutput("plot1", height = paste0(hei,'px'))),
                           tabPanel(title = "Location inference", plotOutput("plot2", height = paste0(hei,'px'))),
                           tabPanel(title = "Location table", DT::DTOutput("plot3", height = '450px')),
-                          tabPanel(title = "Density", plotOutput("plot4", height = paste0(hei,'px')))
-                          )
+                          tabPanel(title = "Density", plotOutput("plot4", height = paste0(hei,'px'))))
         }
         do.call(tabsetPanel, tablist)
       }
