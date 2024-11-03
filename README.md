@@ -12,7 +12,7 @@ This R package is designed to distribute the *RecView* ShinyApp which aims at pr
 
 ## **Installation**
 
-`devtools::install_github("HKyleZhang/RecView@new_feature_WIP")`
+`devtools::install_github("HKyleZhang/RecView")`
 
 <br>
 
