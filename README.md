@@ -6,7 +6,7 @@ This R package is designed to distribute the *RecView* ShinyApp which aims at pr
 
 <br>
 
-![](https://github.com/HKyleZhang/RecView/blob/new_feature_WIP/inst/example_screenshot/example_screenshot.png)
+![](https://github.com/HKyleZhang/RecView/blob/main/inst/example_screenshot/example_screenshot.png)
 
 <br>
 
