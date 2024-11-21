@@ -8,7 +8,7 @@ This R package is designed to distribute the *RecView* ShinyApp which aims at pr
 
 ## **Installation**
 
-- Developmental `devtools::install_github("HKyleZhang/RecView@dev")`
+- Developing: `devtools::install_github("HKyleZhang/RecView@dev")`
 - Latest (v1.1.0): `devtools::install_github("HKyleZhang/RecView@v1.1.0")`
 
 Click [here](https://github.com/HKyleZhang/RecView) to see all the details about the package.
