@@ -12,7 +12,7 @@ recview_server <- function(input, output, session) {
   
   ### Files input ----
   roots <- c("Current Directory" = ".", "Upper Directory" = "..", Home = fs::path_home())
-  shinyFiles::shinyFileChoose(input, id = "genofile", roots = roots, defaultRoot = "Current Directory", session = session, filetypes = c('', 'csv'))
+  shinyFiles::shinyFileChoose(input, id = "genofile", roots = roots, defaultRoot = "Current Directory", session = session, filetypes = c('', 'csv', 'rds'))
   shinyFiles::shinyFileChoose(input, id = "scfile", roots = roots, defaultRoot = "Current Directory", session = session, filetypes = c('', 'csv'))
   
   output$genofile_attached <- renderUI({
@@ -33,9 +33,21 @@ recview_server <- function(input, output, session) {
   
   output$off <- renderUI({
     if(!is.integer(input$genofile)) {
-      all_columns <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 1, col_types = cols(), progress = FALSE) %>%
-        colnames() %>%
-        str_sort(numeric = T)
+      if (grepl(".rds", shinyFiles::parseFilePaths(roots, input$genofile)$name)) {
+        all_columns <- fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath, from = 1, to = 1) %>% 
+          colnames() %>%
+          str_sort(numeric = T)
+      } else {
+        all_columns <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(Missing_ind = col_character(),
+                                                                                                             A = col_character(),
+                                                                                                             B = col_character(),
+                                                                                                             C = col_character(),
+                                                                                                             D = col_character(),
+                                                                                                             AB = col_character(),
+                                                                                                             CD = col_character()), progress = FALSE, n_max = 1) %>% 
+          colnames() %>%
+          str_sort(numeric = T)
+      }
       ind_id <- all_columns[!(all_columns %in% c("id", "CHROM", "POS", "Missing_ind_num", "Missing_ind", "A", "B", "C", "D", "AB", "CD"))]
       selectInput(inputId = "off",
                   label = "Choose Offspring(s):",
@@ -1044,19 +1056,9 @@ recview_server <- function(input, output, session) {
         ch_in[i] <- str_trim(ch_in[i], side = "both")
       }
       
-      if (file.exists(paste0(shinyFiles::parseFilePaths(roots, input$genofile)$name, ".idx"))) {
-        read_rows <- read_tsv(paste0(shinyFiles::parseFilePaths(roots, input$genofile)$name, ".idx"), col_types = cols(POS = col_character()), progress = FALSE) %>% 
-          filter(CHR %in% ch_in) %>% 
-          pull(POS) %>% 
-          str_trim(side = "both") %>% 
-          str_flatten_comma() %>% 
-          str_split_1(pattern = ",") %>% 
-          as.numeric()
-        
-        header <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 1, col_types = cols(), progress = FALSE) %>% colnames()
-        laf <- LaF::laf_open_csv(filename = shinyFiles::parseFilePaths(roots, input$genofile)$datapath, column_types = c(rep("character", 2), "numeric", rep("character", 2), rep("numeric", length(header) - 5)), column_names = header, skip = 1)
-        dd_in <- laf[read_rows,] %>% 
-          `colnames<-`(.,header)
+      if (grepl(".rds", shinyFiles::parseFilePaths(roots, input$genofile)$name)) {
+        dd_in <- fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath) %>% 
+          as_tibble()
       } else {
         dd_in <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(Missing_ind = col_character(),
                                                                                                        A = col_character(),
