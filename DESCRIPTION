@@ -1,7 +1,7 @@
 Package: RecView
 Type: Package
 Title: View and Locate Recombination Positions Using Pedigree Data
-Version: dev
+Version: 1.1.0-1
 Author: Hongkai Zhang
 Maintainer: Hongkai Zhang <hongkai.zhang@biol.lu.se>
 Description: The package is designed to distribute the "RecView" ShinyApp which aims at providing a user-friendly GUI for viewing and locating recombination positions on chromosomes recombination positions using pedigree data.
