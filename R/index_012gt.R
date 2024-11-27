@@ -5,7 +5,7 @@
 #' @param scaffold_file a file with the same format as used in RecView ShinyApp.
 #' @note The file will be saved with the extension of .idx
 #'
-#' @export
+#' @noRd
 index_012gt <- function(genotype_file, scaffold_file) {
   sc <- read_csv(scaffold_file, col_types = cols(CHR = col_character(),
                                                          order = col_double(),
