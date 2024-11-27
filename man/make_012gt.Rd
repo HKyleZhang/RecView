@@ -11,11 +11,13 @@ make_012gt(gt, F0F1_rename, save_filename)
 
 \item{F0F1_rename}{a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother) and F1 (father, mother); use "NA" if missing.}
 
-\item{save_filename}{the name for saving the '012'-formatted output, as .csv .}
+\item{save_filename}{the name for saving the '012'-formatted output, as .rds .}
+
+\item{readable}{if TRUE, a CSV file will also be produced.}
 }
 \description{
 Make the genotype file in designated '012' format for RecView ShinyApp.
 }
 \note{
-The file will be saved as .csv
+The file will be saved as .rds
 }
