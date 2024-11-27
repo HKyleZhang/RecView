@@ -16,6 +16,8 @@ rec_2gen(data, sc_order, chromosome, offspring, precision)
 \item{offspring}{the offspring to be included in the analysis.}
 
 \item{precision}{the maximal base pairs in which the detected recombination positions will be pooled.}
+
+\item{method}{the algorithm to identify the change point. "CCS", "PD", or "changepoint".}
 }
 \description{
 Locate recombination with two-generation pedigree that consists of father, mother and at least two offspring
