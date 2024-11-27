@@ -6,10 +6,11 @@
 #' @param chromosome chromosome.
 #' @param offspring the offspring to be included in the analysis.
 #' @param precision the maximal base pairs in which the detected recombination positions will be pooled.
+#' @param method the algorithm to identify the change point. "CCS", "PD", or "changepoint".
 #' @note This function produces a S3 class "RecView".
 #' 
 #' @export
-rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4) {
+rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, method = "changepoint", ...) {
   # functions ----
   calc_distm <- function(x) {
     x <- str_split_1(x, "_")
@@ -17,7 +18,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4) {
     return(dm)
   }
   
-  get_cp <- function(input, data_in, offspring_in, precision) {
+  get_cp <- function(input, data_in, offspring_in, precision, method, ...) {
     dms <- data_in$dm
     index <- input$index[1]
     off_index <- which(seq(1,length(offspring_in)) != index)
@@ -49,15 +50,28 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4) {
       arrange(POS_chr)
     
     cps <- list()
-    for (i in colnames(pairwise_tb)) {
-      cpt <- changepoint::cpt.mean(pull(data_in_mod, i))@cpts
-      cps[[length(cps)+1]] <- cpt[cpt != nrow(data_in_mod)]
+    if (method == "changepoint") {
+      for (i in colnames(pairwise_tb)) {
+        cpt <- changepoint::cpt.mean(pull(data_in_mod, i), minseglen = 1, ...)
+        cps[[length(cps)+1]] <- data_in_mod$POS_chr[changepoint::cpts(cpt)]
+      }
+    } else if (method == "CCS") {
+      for (i in colnames(pairwise_tb)) {
+        cps[[length(cps)+1]] <- CCS_algorithm(x = data_in_mod, value_col = i, threshold = 50, full_result = FALSE) %>% 
+          mutate(start_POS = data_in_mod$POS_chr[start_row], end_POS = data_in_mod$POS_chr[end_row]) %>% 
+          mutate(middle_POS = (start_POS + end_POS) / 2) %>% 
+          pull(middle_POS)
+      }
+    } else if (method == "PD") {
+      for (i in colnames(pairwise_tb)) {
+        cpt <- PD_algorithm(x = data_in_mod, value_col = i, window_size = 1100, threshold = 0.8, full_result = FALSE)
+        cps[[length(cps)+1]] <- data_in_mod$POS_chr[cpt]
+      }
     }
     
     if (length(cps) == 1) {
       cps <- unlist(cps)
-      position_result <- tibble(cps = cps) %>% 
-        mutate(POS_chr = data_in_mod$POS_chr[cps]) %>% 
+      position_result <- tibble(POS_chr = cps) %>% 
         mutate(ID = seq(1, nrow(.))) %>%
         arrange(POS_chr)
       if (length(cps) > 1) {
@@ -83,17 +97,14 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4) {
     } else if (length(cps) > 1) {
       cps <- reduce(cps, c)
       if (length(unique(cps[duplicated(cps)])) == 1) {
-        position_result <- tibble(cps = unique(cps[duplicated(cps)])) %>% 
-          mutate(ID = 1, Mean_bp = data_in_mod$POS_chr[cps], SD_bp = as.numeric(NA)) %>% 
+        position_result <- tibble(POS_chr = unique(cps[duplicated(cps)])) %>% 
+          mutate(ID = 1, Mean_bp = POS_chr, SD_bp = as.numeric(NA)) %>% 
           select(ID, Mean_bp, SD_bp)
         
       } else if (length(unique(cps[duplicated(cps)])) > 1) {
-        cps_mod <- tibble(cps = unique(cps[duplicated(cps)])) %>% 
-          arrange(cps) %>% 
-          mutate(ID = c(1, rep(0, times = nrow(.) - 1))) %>% 
-          rowwise() %>% 
-          mutate(POS_chr = data_in_mod$POS_chr[cps]) %>% 
-          ungroup()
+        cps_mod <- tibble(POS_chr = unique(cps[duplicated(cps)])) %>% 
+          arrange(POS_chr) %>% 
+          mutate(ID = c(1, rep(0, times = nrow(.) - 1)))
         
         for (i in 1:(nrow(cps_mod)-1)) {
           for (j in (i+1):nrow(cps_mod)) {
@@ -182,7 +193,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4) {
   res_pat <- tibble(Offspring = offspring) %>% 
     mutate(index = seq(1, nrow(.))) %>% 
     nest(input = !Offspring) %>% 
-    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision)) %>% 
+    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision, method)) %>% 
     unnest(cols = "output") %>% 
     select(-input) %>% 
     mutate(Note = '-', Side = "Paternal")
@@ -242,7 +253,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4) {
   res_mat <- tibble(Offspring = offspring) %>% 
     mutate(index = seq(1, nrow(.))) %>% 
     nest(input = !Offspring) %>% 
-    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision)) %>% 
+    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision, method)) %>% 
     unnest(cols = "output") %>% 
     select(-input) %>% 
     mutate(Note = '-', Side = "Maternal")
@@ -289,7 +300,9 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4) {
               offspring = offspring, 
               pairwise_comparison = comparison_result, 
               recombination_position = position_result,
-              precision = precision)
+              precision = precision,
+              method = method,
+              params = ...)
   
   cat('\nDone!')
   
