@@ -3,7 +3,6 @@
 S3method(plot,RecView)
 export(CCS_algorithm)
 export(PD_algorithm)
-export(index_012gt)
 export(make_012gt)
 export(make_012gt_from_vcf)
 export(rec_2gen)
