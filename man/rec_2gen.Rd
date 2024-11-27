@@ -4,12 +4,12 @@
 \alias{rec_2gen}
 \title{Locate recombination with two-generation pedigree}
 \usage{
-rec_2gen(data, sc_order, chromosome, offspring, precision)
+rec_2gen(data, sc_order, chromosome = 1, offspring = c("off1", "off2", "off3"), precision = 1e4, method = "changepoint")
 }
 \arguments{
-\item{data}{'012'-formatted genotype file, which is the output from make_012gt() or make_012gt_from_vcf().}
+\item{data}{a data frame or tibble of '012'-formatted genotype, which can be made using make_012gt() or make_012gt_from_vcf().}
 
-\item{sc_order}{scaffold file.}
+\item{sc_order}{a data frame or tibble of scaffolds' order and orientation.}
 
 \item{chromosome}{chromosome.}
 
@@ -18,9 +18,11 @@ rec_2gen(data, sc_order, chromosome, offspring, precision)
 \item{precision}{the maximal base pairs in which the detected recombination positions will be pooled.}
 
 \item{method}{the algorithm to identify the change point. "CCS", "PD", or "changepoint".}
+
+\item{...}{more arguments passed down to the algorithm that locates recombination.}
 }
 \description{
-Locate recombination with two-generation pedigree that consists of father, mother and at least two offspring
+Locate recombination with two-generation pedigree that consists of father, mother and at least two offspring.
 }
 \note{
 This function produces a S3 class "RecView".

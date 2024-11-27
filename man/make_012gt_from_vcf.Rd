@@ -4,24 +4,24 @@
 \alias{make_012gt_from_vcf}
 \title{Make '012'-formatted genotype file from VCF}
 \usage{
-make_012gt_from_vcf(gt, F0F1_rename, save_filename)
+make_012gt_from_vcf(vcf = "...", limit = 1.5e9, F0F1_rename = c("PGF", "PGM", "MGF", "MGM", "Father", "Mother"), save_filename = "gt_012.rds", readable = FALSE)
 }
 \arguments{
-\item{vcf}{VCF file of either .vcf or .vcf.gz}
+\item{vcf}{path to the VCF file of .vcf or .vcf.gz.}
 
-\item{limit}{the upper limit for reading in the file}
+\item{limit}{the upper limit for reading in the file.}
 
 \item{F0F1_rename}{a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother) and F1 (father, mother); use "NA" if missing.}
 
-\item{save_filename}{the name for saving the '012'-formatted output, as .rds .}
+\item{save_filename}{the name for saving the '012'-formatted output, as .rds.}
 
 \item{readable}{if TRUE, a CSV file will also be produced.}
 
-\item{...}{more arguments passed down to vcfR::read.vcfR()}
+\item{...}{more arguments passed down to vcfR::read.vcfR().}
 }
 \description{
 Make the genotype file in designated '012' format for RecView ShinyApp.
 }
 \note{
-The file will be saved as .csv
+The file will be saved as .rds.
 }

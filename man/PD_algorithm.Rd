@@ -4,7 +4,7 @@
 \alias{PD_algorithm}
 \title{Proportional Difference (PD) algorithm}
 \usage{
-PD_algorithm(x, value_col, radius, threshold, full_result)
+PD_algorithm(x, value_col = "...", window_size = 1100, threshold = 0.8, full_result = FALSE)
 }
 \arguments{
 \item{x}{a data frame or tibble.}

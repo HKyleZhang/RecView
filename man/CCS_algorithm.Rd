@@ -4,7 +4,7 @@
 \alias{CCS_algorithm}
 \title{Cumulative Continuity Score (CCS) algorithm}
 \usage{
-CCS_algorithm(x, value_col, threshold, full_result)
+CCS_algorithm(x, value_col = "...", threshold = 50, full_result = FALSE)
 }
 \arguments{
 \item{x}{a data frame or tibble.}
