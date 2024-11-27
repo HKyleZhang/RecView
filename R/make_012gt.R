@@ -3,11 +3,12 @@
 #' @usage make_012gt(gt, F0F1_rename, save_filename)
 #' @param gt the output file when using vcftools to extract "GT"
 #' @param F0F1_rename a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother) and F1 (father, mother); use "NA" if missing.
-#' @param save_filename the name for saving the '012'-formatted output, as .csv .
-#' @note The file will be saved as .csv
+#' @param save_filename the name for saving the '012'-formatted output, as .rds .
+#' @param readable if TRUE, a CSV file will also be produced.
+#' @note The file will be saved as .rds
 #'
 #' @export
-make_012gt <- function(gt, F0F1_rename = "no_rename", save_filename = "gt_012.csv") {
+make_012gt <- function(gt, F0F1_rename = "no_rename", save_filename = "gt_012.rds", readable = FALSE) {
   gt <- read_tsv(gt, col_types = cols())
   
   out <- tibble(CHROM = gt$CHROM, POS = gt$POS) %>%
@@ -47,9 +48,19 @@ make_012gt <- function(gt, F0F1_rename = "no_rename", save_filename = "gt_012.cs
       select(id, CHROM, POS, Missing_ind_num, Missing_ind, A, B, C, D, AB, CD, everything())
   }
   
-  if (F0F1_rename[1] != "no_rename") {  
-    write_csv(out_new, file = save_filename)
+  if (F0F1_rename[1] != "no_rename") {
+    if (readable) {
+      write_csv(out_new, file = str_replace(save_filename, ".rds", ".csv"))
+      fst::write_fst(x = out_new, path = save_filename, compress = 100)
+    } else {
+      fst::write_fst(x = out_new, path = save_filename, compress = 100)
+    }
   } else {
-    write_csv(out, file = save_filename)
+    if (readable) {
+      write_csv(out, file = str_replace(save_filename, ".rds", ".csv"))
+      fst::write_fst(x = out_new, path = save_filename, compress = 100)
+    } else {
+      fst::write_fst(x = out_new, path = save_filename, compress = 100)
+    }
   }
 }
