@@ -53,21 +53,37 @@ make_012gt_from_vcf <- function(vcf, limit = 1.5e9, F0F1_rename = "no_rename", s
     out_new <- out_new %>% 
       unnest(cols = "everything_else") %>% 
       select(id, CHROM, POS, Missing_ind_num, Missing_ind, A, B, C, D, AB, CD, everything())
-  }
-  
-  if (F0F1_rename[1] != "no_rename") {
-    if (readable) {
-      write_csv(out_new, file = str_replace(save_filename, ".rds", ".csv"))
-      fst::write_fst(x = out_new, path = save_filename, compress = 100)
-    } else {
-      fst::write_fst(x = out_new, path = save_filename, compress = 100)
-    }
   } else {
-    if (readable) {
-      write_csv(out, file = str_replace(save_filename, ".rds", ".csv"))
-      fst::write_fst(x = out_new, path = save_filename, compress = 100)
-    } else {
-      fst::write_fst(x = out_new, path = save_filename, compress = 100)
+    out_new <- tibble(id = out$id, CHROM = out$CHROM, POS = out$POS)
+    inds <- c("A", "B", "C", "D", "AB", "CD")
+    for (i in inds) {
+      if (i %in% colnames(out)) {
+        out_new <- mutate(out_new, !!i := get(i, out))
+      } else {
+        out_new <- mutate(out_new, !!i := NA)
+      }
     }
+    out_new <- out_new %>% 
+      left_join(out %>% select(id, all_of(colnames(out)[!(colnames(out) %in% colnames(out_new))])), by = "id") %>% 
+      nest(everything_else = !any_of(c("A", "B", "C", "D", "AB", "CD"))) %>% 
+      mutate(Missing_ind_num = 0, Missing_ind = "")
+    
+    for(i in 1:nrow(out_new)) {
+      miss_ind_index_per_row <- which(is.na(c(out_new$A[i], out_new$B[i], out_new$C[i], out_new$D[i], out_new$AB[i], out_new$CD[i])))
+      out_new$Missing_ind_num[i] <- length(miss_ind_index_per_row)
+      out_new$Missing_ind[i] <- str_c(c("A", "B", "C", "D", "AB", "CD")[miss_ind_index_per_row], collapse = "_")
+    }
+    
+    out_new <- out_new %>% 
+      unnest(cols = "everything_else") %>% 
+      select(id, CHROM, POS, Missing_ind_num, Missing_ind, A, B, C, D, AB, CD, everything())
+  }
+  out_new <- out_new %>% arrange(match(id, out$id))
+  
+  if (readable) {
+    write_csv(out_new, file = str_replace(save_filename, ".rds", ".csv"))
+    fst::write_fst(x = out_new, path = save_filename, compress = 100)
+  } else {
+    fst::write_fst(x = out_new, path = save_filename, compress = 100)
   }
 }
