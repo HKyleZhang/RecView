@@ -1,12 +1,13 @@
 #' Locate recombination with two-generation pedigree
-#' @description Locate recombination with two-generation pedigree that consists of father, mother and at least two offspring
-#' @usage rec_2gen(data, sc_order, chromosome, offspring, precision)
-#' @param data '012'-formatted genotype file, which is the output from make_012gt() or make_012gt_from_vcf().
-#' @param sc_order scaffold file.
+#' @description Locate recombination with two-generation pedigree that consists of father, mother and at least two offspring.
+#' @usage rec_2gen(data, sc_order, chromosome = 1, offspring = c("off1", "off2", "off3"), precision = 1e4, method = "changepoint")
+#' @param data a data frame or tibble of '012'-formatted genotype, which can be made using make_012gt() or make_012gt_from_vcf().
+#' @param sc_order a data frame or tibble of scaffolds' order and orientation.
 #' @param chromosome chromosome.
 #' @param offspring the offspring to be included in the analysis.
 #' @param precision the maximal base pairs in which the detected recombination positions will be pooled.
 #' @param method the algorithm to identify the change point. "CCS", "PD", or "changepoint".
+#' @param ... more arguments passed down to the algorithm that locates recombination.
 #' @note This function produces a S3 class "RecView".
 #' 
 #' @export

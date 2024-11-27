@@ -1,7 +1,7 @@
 #' Index '012'-formatted genotype file
 #' @description Index the genotype file for faster access in RecView ShinyApp.
 #' @usage index_012gt(genotype_file, scaffold_file)
-#' @param genotype_file the output of make_012gt() or make_012gt_from_vcf()
+#' @param genotype_file the output of make_012gt() or make_012gt_from_vcf().
 #' @param scaffold_file a file with the same format as used in RecView ShinyApp.
 #' @note The file will be saved with the extension of .idx
 #'

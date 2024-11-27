@@ -1,6 +1,6 @@
 #' Proportional Difference (PD) algorithm
 #' @description Proportional Difference (PD) algorithm for locating change points.
-#' @usage PD_algorithm(x, value_col, radius, threshold, full_result)
+#' @usage PD_algorithm(x, value_col = "...", window_size = 1100, threshold = 0.8, full_result = FALSE)
 #' @param x a data frame or tibble.
 #' @param value_col character; the column in which the change points will be analysed. This column should contain binary data, e.g. 0 and 1.
 #' @param window_size numeric; the size of sliding windows in which the proportion of symbol is checked. Default: 1100.

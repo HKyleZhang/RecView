@@ -1,15 +1,15 @@
 #' Make '012'-formatted genotype file
 #' @description Make the genotype file in designated '012' format for RecView ShinyApp.
-#' @usage make_012gt(gt, F0F1_rename, save_filename)
-#' @param gt the output file when using vcftools to extract "GT"
+#' @usage make_012gt(path = "...", F0F1_rename = c("PGF", "PGM", "MGF", "MGM", "Father", "Mother"), save_filename = "gt_012.rds", readable = FALSE)
+#' @param path the path to the file of using vcftools to extract "GT".
 #' @param F0F1_rename a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother) and F1 (father, mother); use "NA" if missing.
-#' @param save_filename the name for saving the '012'-formatted output, as .rds .
+#' @param save_filename the name for saving the '012'-formatted output, as .rds.
 #' @param readable if TRUE, a CSV file will also be produced.
-#' @note The file will be saved as .rds
+#' @note The file will be saved as .rds.
 #'
 #' @export
-make_012gt <- function(gt, F0F1_rename = "no_rename", save_filename = "gt_012.rds", readable = FALSE) {
-  gt <- read_tsv(gt, col_types = cols())
+make_012gt <- function(path, F0F1_rename = "no_rename", save_filename = "gt_012.rds", readable = FALSE) {
+  gt <- read_tsv(path, col_types = cols())
   
   out <- tibble(CHROM = gt$CHROM, POS = gt$POS) %>%
     unite(col = "id", c("CHROM", "POS"), sep = ':', remove = FALSE) %>%

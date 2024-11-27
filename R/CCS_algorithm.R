@@ -1,6 +1,6 @@
 #' Cumulative Continuity Score (CCS) algorithm
 #' @description Cumulative Continuity Score (CCS) algorithm for locating change points.
-#' @usage CCS_algorithm(x, value_col, threshold, full_result)
+#' @usage CCS_algorithm(x, value_col = "...", threshold = 50, full_result = FALSE)
 #' @param x a data frame or tibble.
 #' @param value_col character; the column in which the change points will be analysed. This column should contain binary data, e.g. 0 and 1.
 #' @param threshold numeric; the CCS value above which the segments will be included for locating the change points. Default = 50.

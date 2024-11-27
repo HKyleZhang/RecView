@@ -1,13 +1,13 @@
 #' Make '012'-formatted genotype file from VCF
 #' @description Make the genotype file in designated '012' format for RecView ShinyApp.
-#' @usage make_012gt_from_vcf(gt, F0F1_rename, save_filename)
-#' @param vcf VCF file of either .vcf or .vcf.gz
-#' @param limit the upper limit for reading in the file
+#' @usage make_012gt_from_vcf(vcf = "...", limit = 1.5e9, F0F1_rename = c("PGF", "PGM", "MGF", "MGM", "Father", "Mother"), save_filename = "gt_012.rds", readable = FALSE)
+#' @param vcf path to the VCF file of .vcf or .vcf.gz.
+#' @param limit the upper limit for reading in the file.
 #' @param F0F1_rename a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother) and F1 (father, mother); use "NA" if missing.
-#' @param save_filename the name for saving the '012'-formatted output, as .rds .
+#' @param save_filename the name for saving the '012'-formatted output, as .rds.
 #' @param readable if TRUE, a CSV file will also be produced.
-#' @param ... more arguments passed down to vcfR::read.vcfR()
-#' @note The file will be saved as .csv
+#' @param ... more arguments passed down to vcfR::read.vcfR().
+#' @note The file will be saved as .rds.
 #'
 #' @export
 make_012gt_from_vcf <- function(vcf, limit = 1.5e9, F0F1_rename = "no_rename", save_filename = "gt_012.rds", readable = FALSE, ...) {
