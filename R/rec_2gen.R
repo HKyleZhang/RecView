@@ -7,19 +7,43 @@
 #' @param offspring the offspring to be included in the analysis.
 #' @param precision the maximal base pairs in which the detected recombination positions will be pooled.
 #' @param method the algorithm to identify the change point. "CCS", "PD", or "changepoint".
-#' @param ... more arguments passed down to the algorithm that locates recombination.
+#' @param method.args more arguments passed down to the algorithm that locates recombination.
 #' @note This function produces a S3 class "RecView".
 #' 
 #' @export
-rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, method = "changepoint", ...) {
+rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, method = "changepoint", method.args = NULL) {
+  if(is.null(method.args)) {
+    if (method == "CCS") method.args <- list(threshold = 50)
+    if (method == "PD") method.args <- list(window_size = 1100, threshold = 0.8)
+  } else {
+    if (method == "PD") {
+      if (is.null(method.args$window_size)) method.args <- list(window_size = 1100, threshold = as.vector(unlist(method.args)))
+      if (is.null(method.args$threshold)) method.args <- list(threshold = 0.8, window_size = as.vector(unlist(method.args)))
+      method.args <- list(window_size = method.args$window_size, threshold = method.args$threshold)
+    }
+  }
+  
   # functions ----
   calc_distm <- function(x) {
     x <- str_split_1(x, "_")
-    dm <- as.matrix(dist(x))
+    dm <- suppressWarnings(as.matrix(dist(x)))
     return(dm)
   }
   
-  get_cp <- function(input, data_in, offspring_in, precision, method, ...) {
+  conditional_overlaps <- function(x, y, threshold = 0.5) {
+    x <- sort(x)
+    y <- sort(y)
+    x_seq <- seq(x[1], x[2])
+    y_seq <- seq(y[1], y[2])
+    olap <- length(which(x_seq %in% y_seq))
+    if (olap / length(x_seq) >= threshold || olap / length(y_seq) >= threshold) {
+      return(TRUE)
+    } else {
+      return(FALSE)
+    }
+  }
+  
+  get_cp <- function(input, data_in, offspring_in, precision, method, method.args) {
     dms <- data_in$dm
     index <- input$index[1]
     off_index <- which(seq(1,length(offspring_in)) != index)
@@ -53,75 +77,81 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
     cps <- list()
     if (method == "changepoint") {
       for (i in colnames(pairwise_tb)) {
-        cpt <- changepoint::cpt.mean(pull(data_in_mod, i), minseglen = 1, ...)
-        cps[[length(cps)+1]] <- data_in_mod$POS_chr[changepoint::cpts(cpt)]
+        data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
+        cpt <- changepoint::cpt.mean(pull(data_in_mod_tmp, i), minseglen = 1)
+        cps[[length(cps)+1]] <- tibble(cps_id = length(cps)+1,
+                                       start_POS = data_in_mod_tmp$POS_chr[changepoint::cpts(cpt)] - precision,
+                                       end_POS = data_in_mod_tmp$POS_chr[changepoint::cpts(cpt)] + precision)
       }
     } else if (method == "CCS") {
       for (i in colnames(pairwise_tb)) {
-        cps[[length(cps)+1]] <- CCS_algorithm(x = data_in_mod, value_col = i, threshold = 50, full_result = FALSE) %>% 
-          mutate(start_POS = data_in_mod$POS_chr[start_row], end_POS = data_in_mod$POS_chr[end_row]) %>% 
-          mutate(middle_POS = (start_POS + end_POS) / 2) %>% 
-          pull(middle_POS)
+        data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
+        cps[[length(cps)+1]] <- CCS_algorithm(x = data_in_mod_tmp, value_col = i, threshold = ifelse(is.null(method.args$threshold), 50, method.args$threshold), full_result = FALSE) %>% 
+          mutate(cps_id = length(cps)+1, start_POS = data_in_mod_tmp$POS_chr[start_row], end_POS = data_in_mod_tmp$POS_chr[end_row]) %>% 
+          select(cps_id, start_POS, end_POS)
       }
     } else if (method == "PD") {
       for (i in colnames(pairwise_tb)) {
-        cpt <- PD_algorithm(x = data_in_mod, value_col = i, window_size = 1100, threshold = 0.8, full_result = FALSE)
-        cps[[length(cps)+1]] <- data_in_mod$POS_chr[cpt]
+        data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
+        cpt <- PD_algorithm(x = data_in_mod_tmp, value_col = i, window_size = ifelse(is.null(method.args$window_size), 1100, method.args$window_size), threshold = ifelse(is.null(method.args$threshold), 0.8, method.args$threshold), full_result = FALSE)
+        cps[[length(cps)+1]] <- tibble(cps_id = length(cps)+1,
+                                       start_POS = data_in_mod_tmp$POS_chr[cpt] - precision,
+                                       end_POS = data_in_mod_tmp$POS_chr[cpt] + precision)
       }
     }
     
-    if (length(cps) == 1) {
-      cps <- unlist(cps)
-      position_result <- tibble(POS_chr = cps) %>% 
-        mutate(ID = seq(1, nrow(.))) %>%
-        arrange(POS_chr)
-      if (length(cps) > 1) {
-        for (i in 1:(nrow(position_result)-1)) {
-          for (j in (i+1):nrow(position_result)) {
-            if (abs(position_result$POS_chr[j] - position_result$POS_chr[i]) <= precision) {
-              position_result$ID[j] <- position_result$ID[i]
-            } else {
-              position_result$ID[j] <- position_result$ID[i] + 1
-            }
-          }
+    
+    position_result <- reduce(cps, bind_rows) %>% 
+      mutate(ID = seq(1, nrow(.)), K = 0)
+    
+    if (nrow(position_result) == 1) {
+      position_result <- position_result %>% 
+        mutate(Mean_bp = (start_POS + end_POS)/2, SD_bp = as.numeric(NA)) %>% 
+        select(ID, Mean_bp, SD_bp)
+    } else if (nrow(position_result) > 1) {
+      overlaps_matrix <- matrix(rep("", times = nrow(position_result)^2), nrow = nrow(position_result))
+      for (i in 1:nrow(position_result)) {
+        for (j in i:nrow(position_result)) {
+          rangeA <- c(position_result$start_POS[i], position_result$end_POS[i])
+          rangeB <- c(position_result$start_POS[j], position_result$end_POS[j])
+          A_threshold <- ifelse(precision/abs(rangeA[2]-rangeA[1]) <= 1, precision/abs(rangeA[2]-rangeA[1]), abs(rangeA[2]-rangeA[1])/precision)
+          B_threshold <- ifelse(precision/abs(rangeB[2]-rangeB[1]) <= 1, precision/abs(rangeB[2]-rangeB[1]), abs(rangeB[2]-rangeB[1])/precision)
+          overlaps_matrix[j,i] <- conditional_overlaps(x = rangeA, y = rangeB, threshold = min(A_threshold, B_threshold))
         }
-        
-        position_result <- position_result %>% 
-          summarise(Mean_bp = mean(POS_chr), SD_bp = sd(POS_chr), .by = "ID")
-      } else {
-        position_result <- position_result %>% 
-          mutate(SD_bp = as.numeric(NA)) %>% 
-          select(ID, POS_chr, SD_bp) %>% 
-          `colnames<-`(.,c("ID", "Mean_bp", "SD_bp"))
-        
       }
-    } else if (length(cps) > 1) {
-      cps <- reduce(cps, c)
-      if (length(unique(cps[duplicated(cps)])) == 1) {
-        position_result <- tibble(POS_chr = unique(cps[duplicated(cps)])) %>% 
-          mutate(ID = 1, Mean_bp = POS_chr, SD_bp = as.numeric(NA)) %>% 
-          select(ID, Mean_bp, SD_bp)
-        
-      } else if (length(unique(cps[duplicated(cps)])) > 1) {
-        cps_mod <- tibble(POS_chr = unique(cps[duplicated(cps)])) %>% 
-          arrange(POS_chr) %>% 
-          mutate(ID = c(1, rep(0, times = nrow(.) - 1)))
-        
-        for (i in 1:(nrow(cps_mod)-1)) {
-          for (j in (i+1):nrow(cps_mod)) {
-            if (abs(cps_mod$POS_chr[j] - cps_mod$POS_chr[i]) <= precision) {
-              cps_mod$ID[j] <- cps_mod$ID[i]
-            } else {
-              cps_mod$ID[j] <- cps_mod$ID[i] + 1
-            }
-          }
+      
+      all_i <- vector()
+      for (i in 1:nrow(position_result)) {
+        if (!( i %in% all_i)) {
+          position_result$K[which(overlaps_matrix[i:nrow(position_result),i] == "TRUE")+i-1] <- max(position_result$K)+1
         }
-        
-        position_result <- cps_mod %>% 
-          summarise(Mean_bp = mean(POS_chr), SD_bp = sd(POS_chr), .by = "ID")
-      } else {
-        position_result <- tibble(ID = as.numeric(), Mean_bp = as.numeric(), SD_bp = as.numeric())
+        all_i <- unique(c(all_i, which(overlaps_matrix[i:nrow(position_result),i] == "TRUE")+i-1))
       }
+      position_result <- position_result %>% 
+        select(cps_id, K, start_POS, end_POS) %>% 
+        `colnames<-`(.,c("cps_id", "ID", "start_POS", "end_POS"))
+      
+      if (length(cps) == 1) {
+        position_result <- position_result %>% 
+          mutate(POS_chr = (start_POS + end_POS)/2) %>% 
+          summarise(Mean_bp = mean(POS_chr), SD_bp = sd(POS_chr), .by = "ID") %>% 
+          arrange(ID)
+      } else if (length(cps) > 1) {
+        position_result <- position_result %>% 
+          mutate(POS_chr = (start_POS + end_POS)/2) %>% 
+          summarise(Mean_bp_cps = mean(POS_chr), .by = c("cps_id", "ID")) %>% 
+          summarise(Mean_bp = mean(Mean_bp_cps), SD_bp = sd(Mean_bp_cps), n = length(Mean_bp_cps), .by = "ID") %>% 
+          filter(n > 1) %>% 
+          select(-n)
+        
+        if (nrow(position_result) > 0) {
+          position_result <- position_result %>% mutate(ID = seq(1, nrow(.)))
+        } else {
+          position_result <- tibble(ID = as.numeric(), Mean_bp = as.numeric(), SD_bp = as.numeric())
+        }
+      }
+    } else {
+      position_result <- tibble(ID = as.numeric(), Mean_bp = as.numeric(), SD_bp = as.numeric())
     }
     
     comparison_result <- data_in_mod %>% 
@@ -179,8 +209,18 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
     ungroup()
   
   for (i in offspring) {
-    data_chr_mod <- data_chr_mod %>% 
-      filter(get(i, .) <= sumAB_CD, get(i, .) >= minAB_CD)
+    data_chr_tmp <- data_chr_mod %>% 
+      mutate(condition_1 = get(i,.) <= sumAB_CD & get(i,.) >= minAB_CD) 
+    
+    offspring_gts <- get(i, data_chr_tmp)
+    offspring_gts[which(get("condition_1", data_chr_tmp) == FALSE)] <- NA
+    
+    data_chr_mod <- data_chr_tmp %>% 
+      mutate({{i}} := offspring_gts) %>% 
+      mutate(condition_2 = is.na(get(i,.))) %>% 
+      mutate(keep = condition_1 | condition_2) %>% 
+      filter(keep == TRUE) %>% 
+      select(-condition_1, -condition_2, -keep)
   }
   
   data_chr_mod <- data_chr_mod %>% 
@@ -194,7 +234,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
   res_pat <- tibble(Offspring = offspring) %>% 
     mutate(index = seq(1, nrow(.))) %>% 
     nest(input = !Offspring) %>% 
-    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision, method)) %>% 
+    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision, method, method.args)) %>% 
     unnest(cols = "output") %>% 
     select(-input) %>% 
     mutate(Note = '-', Side = "Paternal")
@@ -239,8 +279,18 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
     ungroup()
   
   for (i in offspring) {
-    data_chr_mod <- data_chr_mod %>% 
-      filter(get(i, .) <= sumAB_CD, get(i, .) >= minAB_CD)
+    data_chr_tmp <- data_chr_mod %>% 
+      mutate(condition_1 = get(i,.) <= sumAB_CD & get(i,.) >= minAB_CD) 
+    
+    offspring_gts <- get(i, data_chr_tmp)
+    offspring_gts[which(get("condition_1", data_chr_tmp) == FALSE)] <- NA
+    
+    data_chr_mod <- data_chr_tmp %>% 
+      mutate({{i}} := offspring_gts) %>% 
+      mutate(condition_2 = is.na(get(i,.))) %>% 
+      mutate(keep = condition_1 | condition_2) %>% 
+      filter(keep == TRUE) %>% 
+      select(-condition_1, -condition_2, -keep)
   }
   
   data_chr_mod <- data_chr_mod %>% 
@@ -254,7 +304,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
   res_mat <- tibble(Offspring = offspring) %>% 
     mutate(index = seq(1, nrow(.))) %>% 
     nest(input = !Offspring) %>% 
-    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision, method)) %>% 
+    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision, method, method.args)) %>% 
     unnest(cols = "output") %>% 
     select(-input) %>% 
     mutate(Note = '-', Side = "Maternal")
@@ -303,7 +353,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
               recombination_position = position_result,
               precision = precision,
               method = method,
-              params = ...)
+              method.args = unlist(method.args))
   
   cat('\nDone!')
   
