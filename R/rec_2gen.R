@@ -1,17 +1,17 @@
 #' Locate recombination with two-generation pedigree
 #' @description Locate recombination with two-generation pedigree that consists of father, mother and at least two offspring.
-#' @usage rec_2gen(data, sc_order, chromosome = 1, offspring = c("off1", "off2", "off3"), precision = 1e4, method = "changepoint")
+#' @usage rec_2gen(data, sc_order, chromosome = 1, offspring = c("off1", "off2", "off3"), grouping_distance = 1e4, method = "changepoint")
 #' @param data a data frame or tibble of '012'-formatted genotype, which can be made using make_012gt() or make_012gt_from_vcf().
 #' @param sc_order a data frame or tibble of scaffolds' order and orientation.
 #' @param chromosome chromosome.
 #' @param offspring the offspring to be included in the analysis.
-#' @param precision the maximal base pairs in which the detected recombination positions will be pooled.
+#' @param grouping_distance the maximal base pairs in which the detected recombination positions will be grouped.
 #' @param method the algorithm to identify the change point. "CCS", "PD", or "changepoint".
 #' @param method.args more arguments passed down to the algorithm that locates recombination.
 #' @note This function produces a S3 class "RecView".
 #' 
 #' @export
-rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, method = "changepoint", method.args = NULL) {
+rec_2gen <- function(data, sc_order, chromosome, offspring, grouping_distance = 1e4, method = "changepoint", method.args = NULL) {
   if(is.null(method.args)) {
     if (method == "CCS") method.args <- list(threshold = 50)
     if (method == "PD") method.args <- list(window_size = 1100, threshold = 0.8)
@@ -43,7 +43,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
     }
   }
   
-  get_cp <- function(input, data_in, offspring_in, precision, method, method.args) {
+  get_cp <- function(input, data_in, offspring_in, grouping_distance, method, method.args) {
     dms <- data_in$dm
     index <- input$index[1]
     off_index <- which(seq(1,length(offspring_in)) != index)
@@ -80,8 +80,8 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
         data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
         cpt <- changepoint::cpt.mean(pull(data_in_mod_tmp, i), minseglen = 1)
         cps[[length(cps)+1]] <- tibble(cps_id = length(cps)+1,
-                                       start_POS = data_in_mod_tmp$POS_chr[changepoint::cpts(cpt)] - precision,
-                                       end_POS = data_in_mod_tmp$POS_chr[changepoint::cpts(cpt)] + precision)
+                                       start_POS = data_in_mod_tmp$POS_chr[changepoint::cpts(cpt)] - grouping_distance,
+                                       end_POS = data_in_mod_tmp$POS_chr[changepoint::cpts(cpt)] + grouping_distance)
       }
     } else if (method == "CCS") {
       for (i in colnames(pairwise_tb)) {
@@ -95,8 +95,8 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
         data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
         cpt <- PD_algorithm(x = data_in_mod_tmp, value_col = i, window_size = ifelse(is.null(method.args$window_size), 1100, method.args$window_size), threshold = ifelse(is.null(method.args$threshold), 0.8, method.args$threshold), full_result = FALSE)
         cps[[length(cps)+1]] <- tibble(cps_id = length(cps)+1,
-                                       start_POS = data_in_mod_tmp$POS_chr[cpt] - precision,
-                                       end_POS = data_in_mod_tmp$POS_chr[cpt] + precision)
+                                       start_POS = data_in_mod_tmp$POS_chr[cpt] - grouping_distance,
+                                       end_POS = data_in_mod_tmp$POS_chr[cpt] + grouping_distance)
       }
     }
     
@@ -106,16 +106,16 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
     
     if (nrow(position_result) == 1) {
       position_result <- position_result %>% 
-        mutate(Mean_bp = (start_POS + end_POS)/2, SD_bp = as.numeric(NA)) %>% 
-        select(ID, Mean_bp, SD_bp)
+        mutate(Mean_bp = (start_POS + end_POS)/2, SE_bp = as.numeric(NA)) %>% 
+        select(ID, Mean_bp, SE_bp)
     } else if (nrow(position_result) > 1) {
       overlaps_matrix <- matrix(rep("", times = nrow(position_result)^2), nrow = nrow(position_result))
       for (i in 1:nrow(position_result)) {
         for (j in i:nrow(position_result)) {
           rangeA <- c(position_result$start_POS[i], position_result$end_POS[i])
           rangeB <- c(position_result$start_POS[j], position_result$end_POS[j])
-          A_threshold <- ifelse(precision/abs(rangeA[2]-rangeA[1]) <= 1, precision/abs(rangeA[2]-rangeA[1]), abs(rangeA[2]-rangeA[1])/precision)
-          B_threshold <- ifelse(precision/abs(rangeB[2]-rangeB[1]) <= 1, precision/abs(rangeB[2]-rangeB[1]), abs(rangeB[2]-rangeB[1])/precision)
+          A_threshold <- ifelse(grouping_distance/abs(rangeA[2]-rangeA[1]) <= 1, grouping_distance/abs(rangeA[2]-rangeA[1]), abs(rangeA[2]-rangeA[1])/grouping_distance)
+          B_threshold <- ifelse(grouping_distance/abs(rangeB[2]-rangeB[1]) <= 1, grouping_distance/abs(rangeB[2]-rangeB[1]), abs(rangeB[2]-rangeB[1])/grouping_distance)
           overlaps_matrix[j,i] <- conditional_overlaps(x = rangeA, y = rangeB, threshold = min(A_threshold, B_threshold))
         }
       }
@@ -134,24 +134,24 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
       if (length(cps) == 1) {
         position_result <- position_result %>% 
           mutate(POS_chr = (start_POS + end_POS)/2) %>% 
-          summarise(Mean_bp = mean(POS_chr), SD_bp = sd(POS_chr), .by = "ID") %>% 
+          summarise(Mean_bp = mean(POS_chr), SE_bp = sd(POS_chr)/sqrt(length(POS_chr)) , .by = "ID") %>% 
           arrange(ID)
       } else if (length(cps) > 1) {
         position_result <- position_result %>% 
+          summarise(start_POS = min(start_POS), end_POS = max(end_POS), .by = c("cps_id", "ID")) %>% 
           mutate(POS_chr = (start_POS + end_POS)/2) %>% 
-          summarise(Mean_bp_cps = mean(POS_chr), .by = c("cps_id", "ID")) %>% 
-          summarise(Mean_bp = mean(Mean_bp_cps), SD_bp = sd(Mean_bp_cps), n = length(Mean_bp_cps), .by = "ID") %>% 
+          summarise(Mean_bp = mean(POS_chr), SE_bp = sd(POS_chr) / sqrt(length(POS_chr)) , n = length(POS_chr), .by = "ID") %>% 
           filter(n > 1) %>% 
           select(-n)
         
         if (nrow(position_result) > 0) {
           position_result <- position_result %>% mutate(ID = seq(1, nrow(.)))
         } else {
-          position_result <- tibble(ID = as.numeric(), Mean_bp = as.numeric(), SD_bp = as.numeric())
+          position_result <- tibble(ID = as.numeric(), Mean_bp = as.numeric(), SE_bp = as.numeric())
         }
       }
     } else {
-      position_result <- tibble(ID = as.numeric(), Mean_bp = as.numeric(), SD_bp = as.numeric())
+      position_result <- tibble(ID = as.numeric(), Mean_bp = as.numeric(), SE_bp = as.numeric())
     }
     
     comparison_result <- data_in_mod %>% 
@@ -234,7 +234,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
   res_pat <- tibble(Offspring = offspring) %>% 
     mutate(index = seq(1, nrow(.))) %>% 
     nest(input = !Offspring) %>% 
-    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision, method, method.args)) %>% 
+    mutate(output = map(input, get_cp, data_chr_mod, offspring, grouping_distance, method, method.args)) %>% 
     unnest(cols = "output") %>% 
     select(-input) %>% 
     mutate(Note = '-', Side = "Paternal")
@@ -304,7 +304,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
   res_mat <- tibble(Offspring = offspring) %>% 
     mutate(index = seq(1, nrow(.))) %>% 
     nest(input = !Offspring) %>% 
-    mutate(output = map(input, get_cp, data_chr_mod, offspring, precision, method, method.args)) %>% 
+    mutate(output = map(input, get_cp, data_chr_mod, offspring, grouping_distance, method, method.args)) %>% 
     unnest(cols = "output") %>% 
     select(-input) %>% 
     mutate(Note = '-', Side = "Maternal")
@@ -351,7 +351,7 @@ rec_2gen <- function(data, sc_order, chromosome, offspring, precision = 1e4, met
               offspring = offspring, 
               pairwise_comparison = comparison_result, 
               recombination_position = position_result,
-              precision = precision,
+              grouping_distance = grouping_distance,
               method = method,
               method.args = unlist(method.args))
   
