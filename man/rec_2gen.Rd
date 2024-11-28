@@ -4,7 +4,7 @@
 \alias{rec_2gen}
 \title{Locate recombination with two-generation pedigree}
 \usage{
-rec_2gen(data, sc_order, chromosome = 1, offspring = c("off1", "off2", "off3"), precision = 1e4, method = "changepoint")
+rec_2gen(data, sc_order, chromosome = 1, offspring = c("off1", "off2", "off3"), grouping_distance = 1e4, method = "changepoint")
 }
 \arguments{
 \item{data}{a data frame or tibble of '012'-formatted genotype, which can be made using make_012gt() or make_012gt_from_vcf().}
@@ -15,7 +15,7 @@ rec_2gen(data, sc_order, chromosome = 1, offspring = c("off1", "off2", "off3"), 
 
 \item{offspring}{the offspring to be included in the analysis.}
 
-\item{precision}{the maximal base pairs in which the detected recombination positions will be pooled.}
+\item{grouping_distance}{the maximal base pairs in which the detected recombination positions will be grouped.}
 
 \item{method}{the algorithm to identify the change point. "CCS", "PD", or "changepoint".}
 
