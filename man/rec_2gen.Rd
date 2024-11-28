@@ -19,7 +19,7 @@ rec_2gen(data, sc_order, chromosome = 1, offspring = c("off1", "off2", "off3"), 
 
 \item{method}{the algorithm to identify the change point. "CCS", "PD", or "changepoint".}
 
-\item{...}{more arguments passed down to the algorithm that locates recombination.}
+\item{method.args}{more arguments passed down to the algorithm that locates recombination.}
 }
 \description{
 Locate recombination with two-generation pedigree that consists of father, mother and at least two offspring.
