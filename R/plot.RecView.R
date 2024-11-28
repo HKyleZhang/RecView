@@ -8,7 +8,8 @@ plot.RecView <- function(obj) {
   cat('Plotting...')
   
   offspring <- obj$offspring
-  comparison_result <- obj$pairwise_comparison
+  comparison_result <- obj$pairwise_comparison %>% 
+    filter(!is.na(Concord_Discord))
   
   group_tb <- tibble(group = unique(comparison_result$group)) %>% 
     separate(col = "group", into = c("a_group", "b_group"), sep = "_<>_", remove = FALSE) %>% 
