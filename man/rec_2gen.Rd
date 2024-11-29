@@ -4,22 +4,20 @@
 \alias{rec_2gen}
 \title{Locate recombination with two-generation pedigree}
 \usage{
-rec_2gen(data, sc_order, chromosome = 1, offspring = c("off1", "off2", "off3"), grouping_distance = 1e4, method = "changepoint")
+rec_2gen(data, scaffold_info, chromosome = 1, offspring = c("off1", "off2", "off3"), method = "changepoint")
 }
 \arguments{
 \item{data}{a data frame or tibble of '012'-formatted genotype, which can be made using make_012gt() or make_012gt_from_vcf().}
 
-\item{sc_order}{a data frame or tibble of scaffolds' order and orientation.}
+\item{scaffold_info}{a data frame or tibble of scaffolds' order and orientation.}
 
 \item{chromosome}{chromosome.}
 
 \item{offspring}{the offspring to be included in the analysis.}
 
-\item{grouping_distance}{the maximal base pairs in which the detected recombination positions will be grouped.}
-
 \item{method}{the algorithm to identify the change point. "CCS", "PD", or "changepoint".}
 
-\item{method.args}{more arguments passed down to the algorithm that locates recombination.}
+\item{method_args}{more arguments passed down to the algorithm that locates recombination.}
 }
 \description{
 Locate recombination with two-generation pedigree that consists of father, mother and at least two offspring.
