@@ -12,15 +12,21 @@
 #' @export
 rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "changepoint", method_args = NULL) {
   if(is.null(method_args)) {
-    if (method == "CCS") method_args <- list(threshold = 50)
-    if (method == "PD") method_args <- list(window_size = 1100, threshold = 0.8)
+    if (method == "CCS") method_args <- list(threshold = 50, se = FALSE)
+    if (method == "PD") method_args <- list(window_size = 400, threshold = 0.8)
   } else {
+    if (method == "CCS") {
+      if (is.null(method_args$threshold)) method_args <- list(threshold = 50, se = as.logical(unlist(method_args)))
+      if (is.null(method_args$se)) method_args <- list(threshold = as.vector(unlist(method_args)), se = FALSE)
+    }
+    
     if (method == "PD") {
-      if (is.null(method_args$window_size)) method_args <- list(window_size = 1100, threshold = as.vector(unlist(method_args)))
+      if (is.null(method_args$window_size)) method_args <- list(window_size = 400, threshold = as.vector(unlist(method_args)))
       if (is.null(method_args$threshold)) method_args <- list(threshold = 0.8, window_size = as.vector(unlist(method_args)))
       method_args <- list(window_size = method_args$window_size, threshold = method_args$threshold)
     }
   }
+  pos_col <- ifelse(method == "CCS", ifelse(method_args$se, "Mean_bp", "Middle_bp"), "Middle_bp")
   
   # functions ----
   calc_distm <- function(x) {
@@ -92,7 +98,7 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
     } else if (method == "PD") {
       for (i in colnames(pairwise_tb)) {
         data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
-        cpt <- PD_algorithm(x = data_in_mod_tmp, value_col = i, window_size = ifelse(is.null(method_args$window_size), 1100, method_args$window_size), threshold = ifelse(is.null(method_args$threshold), 0.8, method_args$threshold), full_result = FALSE)
+        cpt <- PD_algorithm(x = data_in_mod_tmp, value_col = i, window_size = ifelse(is.null(method_args$window_size), 400, method_args$window_size), threshold = ifelse(is.null(method_args$threshold), 0.8, method_args$threshold), full_result = FALSE)
         cps[[length(cps)+1]] <- tibble(cps_id = length(cps)+1,
                                        start_POS = data_in_mod_tmp$POS_chr[cpt],
                                        end_POS = data_in_mod_tmp$POS_chr[cpt])
@@ -100,82 +106,82 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
     }
     
     
-    position_result <- reduce(cps, bind_rows) %>% 
-      mutate(mid_POS = (start_POS + end_POS) / 2)
+    position_result <- reduce(cps, bind_rows) %>% mutate(ID = seq(1, nrow(.)))
     
-    if (nrow(position_result) == 1) {
-      position_result <- position_result %>% 
-        mutate(Mean_bp = (start_POS + end_POS)/2, SE_bp = as.numeric(NA)) %>% 
-        select(ID, Mean_bp, SE_bp)
-    } else if (nrow(position_result) > 1) {
-      range_seq <- list()
-      for (i in 1:nrow(position_result)) {
-        range_seq[[length(range_seq)+1]] <- seq(position_result$start_POS[i], position_result$end_POS[i])
-      }
-      
-      overlaps <- 1
-      for (i in 2:length(range_seq)) {
-        if (length(which((range_seq[[1]] %in% range_seq[[i]]) == TRUE)) > 0) overlaps <- overlaps + 1
-      }
-      
-      if (overlaps != nrow(position_result) && nrow(position_result) > 2) {
-        kmeans_res <- kmeans(x = position_result$mid_POS, centers = 2, nstart = 2)
-        ss_max <- round(kmeans_res$betweenss / kmeans_res$totss, 3)
-        continue <- TRUE
-        centers <- 2
-        while (continue) {
-          centers <- centers + 1
-          if (centers <= length(unique(position_result$mid_POS)) && nrow(position_result) - centers >= 1) {
-            kmeans_res <- kmeans(x = position_result$mid_POS, centers = centers, nstart = centers, iter.max = 25)
-            ss_prop <- round(kmeans_res$betweenss / kmeans_res$totss, 3)
-            if (ss_prop - ss_max > 0.001) {
-              continue <- TRUE
-              ss_max <- ss_prop
-            } else {
-              continue <- FALSE
-              kmeans_res <- kmeans(x = position_result$mid_POS, centers = centers-1, nstart = centers-1)
-              position_result <- position_result %>% 
-                mutate(ID = kmeans_res$cluster)
-            }
-          } else {
-            continue <- FALSE
-            kmeans_res <- kmeans(x = position_result$mid_POS, centers = centers-1, nstart = centers-1)
-            position_result <- position_result %>% 
-              mutate(ID = kmeans_res$cluster)
+    if (nrow(position_result) == 0) {
+      position_result_pass <- tibble(ID = as.numeric(), !!pos_col := as.numeric())
+    } else {
+      if (length(cps) == 1) {
+        position_result_pass <- position_result %>% 
+          mutate(ID = seq(1,nrow(.)), !!pos_col := round((start_POS + end_POS)/2, 0)) %>% 
+          arrange(ID, !!pos_col)
+      } else {
+        position_result <- position_result %>% mutate(n = 0, index = "")
+        
+        overlaps_matrix <- matrix(rep("", times = nrow(position_result)^2), nrow = nrow(position_result))
+        for (i in 1:nrow(position_result)) {
+          for (j in i:nrow(position_result)) {
+            rangeA <- c(position_result$start_POS[i], position_result$end_POS[i])
+            rangeB <- c(position_result$start_POS[j], position_result$end_POS[j])
+            overlaps_matrix[j,i] <- check_overlaps(x = rangeA, y = rangeB)
           }
         }
-      } else {
-        position_result <- position_result %>% 
-          mutate(ID = seq(1,nrow(.)))
-      }
-
-      if (length(cps) == 1) {
-        position_result <- position_result %>% 
-          mutate(POS_chr = (start_POS + end_POS)/2) %>% 
-          summarise(Mean_bp = mean(POS_chr), SE_bp = sd(POS_chr)/sqrt(length(POS_chr)) , .by = "ID") %>% 
-          arrange(ID)
-      } else if (length(cps) > 1) {
-        position_result <- position_result %>% 
-          summarise(start_POS = min(start_POS), end_POS = max(end_POS), .by = c("cps_id", "ID")) %>% 
-          mutate(POS_chr = (start_POS + end_POS)/2) %>% 
-          summarise(Mean_bp = mean(POS_chr), SE_bp = sd(POS_chr) / sqrt(length(POS_chr)) , n = length(POS_chr), .by = "ID") %>% 
-          filter(n > 1) %>% 
-          select(-n)
         
-        if (nrow(position_result) > 0) {
-          position_result <- position_result %>% mutate(ID = seq(1, nrow(.)))
+        all_i <- vector()
+        for (i in 1:nrow(position_result)) {
+          if (!( i %in% all_i)) {
+            position_result$n[i] <- length(which(overlaps_matrix[i:nrow(position_result),i] == TRUE))
+            position_result$index[i] <- str_c(which(overlaps_matrix[i:nrow(position_result),i] == TRUE)+i-1, collapse = ",")
+          }
+          all_i <- unique(c(all_i, which(overlaps_matrix[i:nrow(position_result),i] == "TRUE")+i-1))
+        }
+        n_threshold <- length(cps) / 2
+        if (!is.integer(n_threshold)) n_threshold <- ceiling(length(cps)/2)
+        position_result_pass <- position_result %>% 
+          filter(n >= n_threshold) %>% 
+          mutate(Mean_bp = as.numeric(NA), SE_bp = as.numeric(NA))
+        
+        if (nrow(position_result_pass) > 0) {
+          calc_se <- ifelse(is.null(method_args$se), FALSE, method_args$se)
+          if (calc_se) {
+            for (i in 1:nrow(position_result_pass)) {
+              index <- as.numeric(str_split_1(position_result_pass$index[i], pattern = ","))
+              mid_POS <- vector()
+              for (j in 1:1e3) {
+                index_sample <- sample(index, size = as.integer(runif(n = 1, min = 1, max = length(index))), replace = FALSE)
+                start_POS <- max(position_result$start_POS[index_sample])
+                end_POS <- min(position_result$end_POS[index_sample])
+                mid_POS[length(mid_POS)+1] <- round((start_POS + end_POS)/2, 0)
+              }
+              position_result_pass$Mean_bp[i] <- mean(mid_POS)
+              position_result_pass$SE_bp[i] <- sd(mid_POS) / sqrt(1e3)
+            }
+            position_result_pass <- position_result_pass %>% 
+              arrange(Mean_bp) %>% 
+              mutate(ID = seq(1, nrow(.))) %>% 
+              select(ID, Mean_bp, SE_bp)
+          } else {
+            for (i in 1:nrow(position_result_pass)) {
+              index <- as.numeric(str_split_1(position_result_pass$index[i], pattern = ","))
+              position_result_pass$start_POS[i] <- max(position_result$start_POS[index])
+              position_result_pass$end_POS[i] <- min(position_result$end_POS[index])
+            }
+            position_result_pass <- position_result_pass %>% 
+              mutate(Middle_bp = round((start_POS + end_POS)/2, 0)) %>% 
+              arrange(Middle_bp) %>% 
+              mutate(ID = seq(1, nrow(.))) %>% 
+              select(ID, Middle_bp)
+          }
         } else {
-          position_result <- tibble(ID = as.numeric(), Mean_bp = as.numeric(), SE_bp = as.numeric())
+          position_result_pass <- tibble(ID = as.numeric(), !!pos_col := as.numeric())
         }
       }
-    } else {
-      position_result <- tibble(ID = as.numeric(), Mean_bp = as.numeric(), SE_bp = as.numeric())
     }
     
     comparison_result <- data_in_mod %>% 
       gather(key = "group", value = "Concord_Discord", colnames(pairwise_tb))
     
-    out <- tibble(comparison_result = list(comparison_result), position_result = list(position_result))
+    out <- tibble(comparison_result = list(comparison_result), position_result = list(position_result_pass))
     return(out)
   }
   
@@ -226,6 +232,11 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
     mutate(minAB_CD = min(AB, CD)) %>% 
     ungroup()
   
+  # for (i in offspring) {
+  #   data_chr_mod <- data_chr_mod %>% 
+  #     filter(get(i, .) <= sumAB_CD, get(i, .) >= minAB_CD)
+  # }
+  
   for (i in offspring) {
     data_chr_tmp <- data_chr_mod %>% 
       mutate(condition_1 = get(i,.) <= sumAB_CD & get(i,.) >= minAB_CD) 
@@ -268,36 +279,14 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
       select(-comparison_result) %>% 
       unnest(cols = "position_result") %>% 
       select(Side, Offspring, everything())
-    
-    dup <- position_result_pat %>% 
-      group_by(Mean_bp) %>% 
-      tally() %>% 
-      filter(n > 1) %>% 
-      pull(Mean_bp)
-    
-    position_result_pat$Note[position_result_pat$Mean_bp %in% dup] <- "Likely_Problematic"
-    
-    overlaps_matrix <- matrix(rep("", times = nrow(position_result_pat)^2), nrow = nrow(position_result_pat))
-    for (i in 1:nrow(position_result_pat)) {
-      for (j in i:nrow(position_result_pat)) {
-        rangeA <- c(position_result_pat$Mean_bp[i] - position_result_pat$SE_bp[i], position_result_pat$Mean_bp[i] + position_result_pat$SE_bp[i])
-        rangeB <- c(position_result_pat$Mean_bp[j] - position_result_pat$SE_bp[j], position_result_pat$Mean_bp[j] + position_result_pat$SE_bp[j])
-        overlaps_matrix[j,i] <- check_overlaps(x = rangeA, y = rangeB)
-      }
-    }
-    
-    all_i <- vector()
-    remove_i <- vector()
-    for (i in 1:(nrow(position_result_pat)-1)) {
-      j <- seq(i+1, nrow(position_result_pat))
-      if (!( i %in% all_i)) {
-        remove_i <- unique(c(remove_i, j[which(overlaps_matrix[j,i] == "TRUE")]))
-      }
-      all_i <- unique(c(all_i, which(overlaps_matrix[i:nrow(position_result_pat),i] == "TRUE")+i-1))
-    }
-    
-    position_result_pat <- position_result_pat %>% 
-      slice(which((seq(1,nrow(position_result_pat)) %in% remove_i) == FALSE))
+      
+      dup <- position_result_pat %>% 
+        group_by_at(pos_col) %>% 
+        tally() %>% 
+        filter(n > 1) %>% 
+        get(pos_col, .)
+      
+      position_result_pat$Note[which((get(pos_col, position_result_pat) %in% dup) == TRUE)] <- "Duplication"
   }
   
   comparison_result_pat <- res_pat %>% 
@@ -317,6 +306,11 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
     rowwise() %>% 
     mutate(minAB_CD = min(AB, CD)) %>% 
     ungroup()
+  
+  # for (i in offspring) {
+  #   data_chr_mod <- data_chr_mod %>% 
+  #     filter(get(i, .) <= sumAB_CD, get(i, .) >= minAB_CD)
+  # }
   
   for (i in offspring) {
     data_chr_tmp <- data_chr_mod %>% 
@@ -362,34 +356,12 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
       select(Side, Offspring, everything())
     
     dup <- position_result_mat %>% 
-      group_by(Mean_bp) %>% 
+      group_by_at(pos_col) %>% 
       tally() %>% 
       filter(n > 1) %>% 
-      pull(Mean_bp)
+      get(pos_col, .)
     
-    position_result_mat$Note[position_result_mat$Mean_bp %in% dup] <- "Likely_Problematic"
-    
-    overlaps_matrix <- matrix(rep("", times = nrow(position_result_mat)^2), nrow = nrow(position_result_mat))
-    for (i in 1:nrow(position_result_mat)) {
-      for (j in i:nrow(position_result_mat)) {
-        rangeA <- c(position_result_mat$Mean_bp[i] - position_result_mat$SE_bp[i], position_result_mat$Mean_bp[i] + position_result_mat$SE_bp[i])
-        rangeB <- c(position_result_mat$Mean_bp[j] - position_result_mat$SE_bp[j], position_result_mat$Mean_bp[j] + position_result_mat$SE_bp[j])
-        overlaps_matrix[j,i] <- check_overlaps(x = rangeA, y = rangeB)
-      }
-    }
-    
-    all_i <- vector()
-    remove_i <- vector()
-    for (i in 1:(nrow(position_result_mat)-1)) {
-      j <- seq(i+1, nrow(position_result_mat))
-      if (!( i %in% all_i)) {
-        remove_i <- unique(c(remove_i, j[which(overlaps_matrix[j,i] == "TRUE")]))
-      }
-      all_i <- unique(c(all_i, which(overlaps_matrix[i:nrow(position_result_mat),i] == "TRUE")+i-1))
-    }
-    
-    position_result_mat <- position_result_mat %>% 
-      slice(which((seq(1,nrow(position_result_mat)) %in% remove_i) == FALSE))
+    position_result_mat$Note[which((get(pos_col, position_result_mat) %in% dup) == TRUE)] <- "Duplication"
   }
   
   comparison_result_mat <- res_mat %>% 
@@ -402,7 +374,17 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
   
   # Results collecting ----
   start_time <- Sys.time()
-  position_result <- bind_rows(position_result_pat, position_result_mat) 
+  position_result <- bind_rows(position_result_pat, position_result_mat)
+  position_result$Side <- factor(position_result$Side, levels = c("Paternal", "Maternal"))
+  position_result <- position_result %>% 
+    filter(Note != "Duplication") %>% 
+    select(-Note, -ID) %>% 
+    arrange(Offspring, Side, !!pos_col) %>% 
+    nest(input = !all_of(pos_col)) %>% 
+    mutate(output = map(input, function(tb) tibble(ID = seq(1,nrow(tb))))) %>% 
+    unnest(cols = c("input", "output")) %>% 
+    select(Offspring, Side, ID, everything())
+  
   comparison_result <- bind_rows(comparison_result_pat, comparison_result_mat) 
   
   end_time <- Sys.time()
@@ -414,7 +396,7 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
               pairwise_comparison = comparison_result, 
               recombination_position = position_result,
               method = method,
-              method_args = unlist(method_args))
+              method_args = method_args)
   
   cat('\nDone!')
   
