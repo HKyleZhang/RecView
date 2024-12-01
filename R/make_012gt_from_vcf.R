@@ -1,16 +1,15 @@
 #' Make '012'-formatted genotype file from VCF
 #' @description Make the genotype file in designated '012' format for RecView ShinyApp.
-#' @usage make_012gt_from_vcf(vcf = "...", limit = 1.5e9, F0F1_rename = c("PGF", "PGM", "MGF", "MGM", "Father", "Mother"), save_filename = "gt_012.rds", readable = FALSE)
+#' @usage make_012gt_from_vcf(vcf = "...", limit = 1.5e9, F0F1_rename = c("PGF", "PGM", "MGF", "MGM", "Father", "Mother"), save_filename = "gt_012.csv", compact = FALSE)
 #' @param vcf path to the VCF file of .vcf or .vcf.gz.
 #' @param limit the upper limit for reading in the file.
 #' @param F0F1_rename a vector of the labels of F0 (father's father, father's mother, mother's father, mother's mother) and F1 (father, mother); use "NA" if missing.
-#' @param save_filename the name for saving the '012'-formatted output, as .rds.
-#' @param readable if TRUE, a CSV file will also be produced.
+#' @param save_filename the name for saving the '012'-formatted output.
+#' @param compact if TRUE, a binary format RDS file will also be produced, which takes up smaller storage space.
 #' @param ... more arguments passed down to vcfR::read.vcfR().
-#' @note The file will be saved as .rds.
 #'
 #' @export
-make_012gt_from_vcf <- function(vcf, limit = 1.5e9, F0F1_rename = "no_rename", save_filename = "gt_012.rds", readable = FALSE, ...) {
+make_012gt_from_vcf <- function(vcf, limit = 1.5e9, F0F1_rename = "no_rename", save_filename = "gt_012.csv", compact = FALSE, ...) {
   dd <- vcfR::read.vcfR(file = vcf, limit = limit, verbose = FALSE, ...) %>%
     vcfR::addID(sep = ':')
   
@@ -80,10 +79,10 @@ make_012gt_from_vcf <- function(vcf, limit = 1.5e9, F0F1_rename = "no_rename", s
   }
   out_new <- out_new %>% arrange(match(id, out$id))
   
-  if (readable) {
-    write_csv(out_new, file = str_replace(save_filename, ".rds", ".csv"))
-    fst::write_fst(x = out_new, path = save_filename, compress = 100)
+  if (compact) {
+    write_csv(out_new, file = save_filename)
+    fst::write_fst(x = out_new, path = str_replace(save_filename, ".csv", ".rds"), compress = 100)
   } else {
-    fst::write_fst(x = out_new, path = save_filename, compress = 100)
+    write_csv(out_new, file = save_filename)
   }
 }
