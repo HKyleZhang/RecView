@@ -26,7 +26,7 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
       method_args <- list(window_size = method_args$window_size, threshold = method_args$threshold)
     }
   }
-  pos_col <- ifelse(method == "CCS", ifelse(method_args$se, "Mean_bp", "Middle_bp"), "Middle_bp")
+  pos_col <- ifelse(method == "CCS", ifelse(method_args$se, "Mean_bp", "Middle_bp"), "Position_bp")
   
   # functions ----
   calc_distm <- function(x) {
@@ -113,7 +113,7 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
     } else {
       if (length(cps) == 1) {
         position_result_pass <- position_result %>% 
-          mutate(ID = seq(1,nrow(.)), !!pos_col := round((start_POS + end_POS)/2, 0)) %>% 
+          mutate(ID = seq(1,nrow(.)), !!pos_col := as.integer((start_POS + end_POS)/2)) %>% 
           arrange(ID, !!pos_col)
       } else {
         position_result <- position_result %>% mutate(n = 0, index = "")
@@ -137,24 +137,24 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
         }
         n_threshold <- length(cps) / 2
         if (!is.integer(n_threshold)) n_threshold <- ceiling(length(cps)/2)
-        position_result_pass <- position_result %>% 
-          filter(n >= n_threshold) %>% 
-          mutate(Mean_bp = as.numeric(NA), SE_bp = as.numeric(NA))
+        position_result_pass <- position_result %>% filter(n > n_threshold)  # occurrence must satisfy a certain condition
         
         if (nrow(position_result_pass) > 0) {
-          calc_se <- ifelse(is.null(method_args$se), FALSE, method_args$se)
-          if (calc_se) {
+          if (pos_col == "Mean_bp") {
+            position_result_pass <- position_result_pass %>% 
+              mutate(Mean_bp = as.numeric(NA), SE_bp = as.numeric(NA))
+            
             for (i in 1:nrow(position_result_pass)) {
               index <- as.numeric(str_split_1(position_result_pass$index[i], pattern = ","))
               mid_POS <- vector()
               for (j in 1:1e3) {
-                index_sample <- sample(index, size = as.integer(runif(n = 1, min = 1, max = length(index))), replace = FALSE)
+                index_sample <- sample(index, size = length(index), replace = TRUE)
                 start_POS <- max(position_result$start_POS[index_sample])
                 end_POS <- min(position_result$end_POS[index_sample])
-                mid_POS[length(mid_POS)+1] <- round((start_POS + end_POS)/2, 0)
+                mid_POS[length(mid_POS)+1] <- (start_POS + end_POS)/2
               }
-              position_result_pass$Mean_bp[i] <- mean(mid_POS)
-              position_result_pass$SE_bp[i] <- sd(mid_POS) / sqrt(1e3)
+              position_result_pass$Mean_bp[i] <- as.integer(mean(mid_POS))
+              position_result_pass$SE_bp[i] <- round(sd(mid_POS) / sqrt(1e3), digits = 3)
             }
             position_result_pass <- position_result_pass %>% 
               arrange(Mean_bp) %>% 
@@ -167,10 +167,10 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
               position_result_pass$end_POS[i] <- min(position_result$end_POS[index])
             }
             position_result_pass <- position_result_pass %>% 
-              mutate(Middle_bp = round((start_POS + end_POS)/2, 0)) %>% 
-              arrange(Middle_bp) %>% 
+              mutate(!!pos_col := as.integer((start_POS + end_POS)/2)) %>% 
+              arrange(!!pos_col) %>% 
               mutate(ID = seq(1, nrow(.))) %>% 
-              select(ID, Middle_bp)
+              select(ID, all_of(pos_col))
           }
         } else {
           position_result_pass <- tibble(ID = as.numeric(), !!pos_col := as.numeric())
@@ -233,22 +233,22 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
     ungroup()
   
   # for (i in offspring) {
-  #   data_chr_mod <- data_chr_mod %>% 
+  #   data_chr_mod <- data_chr_mod %>%
   #     filter(get(i, .) <= sumAB_CD, get(i, .) >= minAB_CD)
   # }
   
   for (i in offspring) {
-    data_chr_tmp <- data_chr_mod %>% 
-      mutate(condition_1 = get(i,.) <= sumAB_CD & get(i,.) >= minAB_CD) 
-    
+    data_chr_tmp <- data_chr_mod %>%
+      mutate(condition_1 = get(i,.) <= sumAB_CD & get(i,.) >= minAB_CD)
+
     offspring_gts <- get(i, data_chr_tmp)
     offspring_gts[which(get("condition_1", data_chr_tmp) == FALSE)] <- NA
-    
-    data_chr_mod <- data_chr_tmp %>% 
-      mutate({{i}} := offspring_gts) %>% 
-      mutate(condition_2 = is.na(get(i,.))) %>% 
-      mutate(keep = condition_1 | condition_2) %>% 
-      filter(keep == TRUE) %>% 
+
+    data_chr_mod <- data_chr_tmp %>%
+      mutate({{i}} := offspring_gts) %>%
+      mutate(condition_2 = is.na(get(i,.))) %>%
+      mutate(keep = condition_1 | condition_2) %>%
+      filter(keep == TRUE) %>%
       select(-condition_1, -condition_2, -keep)
   }
   
@@ -266,19 +266,19 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
     mutate(output = map(input, get_cp, data_chr_mod, offspring, method, method_args)) %>% 
     unnest(cols = "output") %>% 
     select(-input) %>% 
-    mutate(Note = '-', Side = "Paternal")
+    mutate(Note = '-', Chromosome_origin = "Paternal")
   
   if (nrow(res_pat) == 2) {
     position_result_pat <- res_pat %>% 
       slice(1) %>% 
       select(-comparison_result, -Offspring) %>% 
       unnest(cols = "position_result") %>% 
-      select(Side, everything())
+      select(Chromosome_origin, everything())
   } else {
     position_result_pat <- res_pat %>% 
       select(-comparison_result) %>% 
       unnest(cols = "position_result") %>% 
-      select(Side, Offspring, everything())
+      select(Chromosome_origin, Offspring, everything())
       
       dup <- position_result_pat %>% 
         group_by_at(pos_col) %>% 
@@ -290,7 +290,7 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
   }
   
   comparison_result_pat <- res_pat %>% 
-    select(comparison_result, Side) %>% 
+    select(comparison_result, Chromosome_origin) %>% 
     unnest(cols = "comparison_result")
   
   end_time <- Sys.time()
@@ -308,22 +308,22 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
     ungroup()
   
   # for (i in offspring) {
-  #   data_chr_mod <- data_chr_mod %>% 
+  #   data_chr_mod <- data_chr_mod %>%
   #     filter(get(i, .) <= sumAB_CD, get(i, .) >= minAB_CD)
   # }
   
   for (i in offspring) {
-    data_chr_tmp <- data_chr_mod %>% 
-      mutate(condition_1 = get(i,.) <= sumAB_CD & get(i,.) >= minAB_CD) 
-    
+    data_chr_tmp <- data_chr_mod %>%
+      mutate(condition_1 = get(i,.) <= sumAB_CD & get(i,.) >= minAB_CD)
+
     offspring_gts <- get(i, data_chr_tmp)
     offspring_gts[which(get("condition_1", data_chr_tmp) == FALSE)] <- NA
-    
-    data_chr_mod <- data_chr_tmp %>% 
-      mutate({{i}} := offspring_gts) %>% 
-      mutate(condition_2 = is.na(get(i,.))) %>% 
-      mutate(keep = condition_1 | condition_2) %>% 
-      filter(keep == TRUE) %>% 
+
+    data_chr_mod <- data_chr_tmp %>%
+      mutate({{i}} := offspring_gts) %>%
+      mutate(condition_2 = is.na(get(i,.))) %>%
+      mutate(keep = condition_1 | condition_2) %>%
+      filter(keep == TRUE) %>%
       select(-condition_1, -condition_2, -keep)
   }
   
@@ -341,19 +341,19 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
     mutate(output = map(input, get_cp, data_chr_mod, offspring, method, method_args)) %>% 
     unnest(cols = "output") %>% 
     select(-input) %>% 
-    mutate(Note = '-', Side = "Maternal")
+    mutate(Note = '-', Chromosome_origin = "Maternal")
   
   if (nrow(res_mat) == 2) {
     position_result_mat <- res_mat %>% 
       slice(1) %>% 
       select(-comparison_result, -Offspring) %>% 
       unnest(cols = "position_result") %>% 
-      select(Side, everything())
+      select(Chromosome_origin, everything())
   } else {
     position_result_mat <- res_mat %>% 
       select(-comparison_result) %>% 
       unnest(cols = "position_result") %>% 
-      select(Side, Offspring, everything())
+      select(Chromosome_origin, Offspring, everything())
     
     dup <- position_result_mat %>% 
       group_by_at(pos_col) %>% 
@@ -365,7 +365,7 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
   }
   
   comparison_result_mat <- res_mat %>% 
-    select(comparison_result, Side) %>% 
+    select(comparison_result, Chromosome_origin) %>% 
     unnest(cols = "comparison_result")
   
   end_time <- Sys.time()
@@ -375,15 +375,15 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
   # Results collecting ----
   start_time <- Sys.time()
   position_result <- bind_rows(position_result_pat, position_result_mat)
-  position_result$Side <- factor(position_result$Side, levels = c("Paternal", "Maternal"))
+  position_result$Chromosome_origin <- factor(position_result$Chromosome_origin, levels = c("Paternal", "Maternal"))
   position_result <- position_result %>% 
     filter(Note != "Duplication") %>% 
     select(-Note, -ID) %>% 
-    arrange(Offspring, Side, !!pos_col) %>% 
-    nest(input = !all_of(pos_col)) %>% 
+    arrange(Offspring, Chromosome_origin, !!pos_col) %>% 
+    nest(input = all_of(pos_col)) %>% 
     mutate(output = map(input, function(tb) tibble(ID = seq(1,nrow(tb))))) %>% 
     unnest(cols = c("input", "output")) %>% 
-    select(Offspring, Side, ID, everything())
+    select(Offspring, Chromosome_origin, ID, all_of(pos_col), everything())
   
   comparison_result <- bind_rows(comparison_result_pat, comparison_result_mat) 
   
@@ -393,10 +393,10 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
   
   out <- list(chromosome = chromosome,
               offspring = offspring, 
-              pairwise_comparison = comparison_result, 
-              recombination_position = position_result,
               method = method,
-              method_args = method_args)
+              method_args = method_args,
+              pairwise_comparison = comparison_result, 
+              recombination_position = position_result)
   
   cat('\nDone!')
   
