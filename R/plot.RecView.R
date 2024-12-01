@@ -16,18 +16,18 @@ plot.RecView <- function(obj) {
     select(group, a_group, b_group)
   
   comparison_result_pat <- comparison_result %>% 
-    filter(Side == "Paternal") %>% 
+    filter(Chromosome_origin == "Paternal") %>% 
     left_join(group_tb %>% `colnames<-`(.,c("group", "x_group", "y_group")), by = "group")
   
   comparison_result_mat <- comparison_result %>% 
-    filter(Side == "Maternal") %>% 
+    filter(Chromosome_origin == "Maternal") %>% 
     left_join(group_tb %>% `colnames<-`(.,c("group", "y_group", "x_group")), by = "group")
   
   comparison_result <- bind_rows(comparison_result_pat, comparison_result_mat) %>% 
-    distinct(Side, POS_chr, x_group, y_group, Concord_Discord, .keep_all = TRUE) %>% 
-    arrange(Side, POS_chr)
+    distinct(Chromosome_origin, POS_chr, x_group, y_group, Concord_Discord, .keep_all = TRUE) %>% 
+    arrange(Chromosome_origin, POS_chr)
   comparison_result$CHROM <- factor(comparison_result$CHROM, levels = unique(comparison_result$CHROM))
-  comparison_result$Side <- factor(comparison_result$Side, levels = c("Paternal", "Maternal"))
+  comparison_result$Chromosome_origin <- factor(comparison_result$Chromosome_origin, levels = c("Paternal", "Maternal"))
   comparison_result$x_group <- factor(comparison_result$x_group, levels = offspring)
   comparison_result$y_group <- factor(comparison_result$y_group, levels = offspring)
   
@@ -89,7 +89,7 @@ plot.RecView <- function(obj) {
   # <<<<
   
   p <- ggplot() +
-    scattermore::geom_scattermore(data = comparison_result, aes(x = POS_chr/1e6, y = Concord_Discord, color = Side), pointsize = point_size, position = position_jitter(height = 0.2), pixels = c(1500, 264)) +
+    scattermore::geom_scattermore(data = comparison_result, aes(x = POS_chr/1e6, y = Concord_Discord, color = Chromosome_origin), pointsize = point_size, position = position_jitter(height = 0.2), pixels = c(1500, 264)) +
     geom_line(data = scaffold_indication, aes(x = POS_chr/1e6, y = -0.5, color = CHROM, group = 1), linewidth = 4) +
     geom_line(data = extra_tb, aes(x = x, y = y, group = 1)) +
     scale_x_continuous(breaks = seq(0, x_axis_max, break_step),
