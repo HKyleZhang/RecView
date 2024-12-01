@@ -114,6 +114,7 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
       if (length(cps) == 1) {
         position_result_pass <- position_result %>% 
           mutate(ID = seq(1,nrow(.)), !!pos_col := as.integer((start_POS + end_POS)/2)) %>% 
+          select(ID, all_of(pos_col)) %>% 
           arrange(ID, !!pos_col)
       } else {
         position_result <- position_result %>% mutate(n = 0, index = "")
@@ -379,11 +380,11 @@ rec_2gen <- function(data, scaffold_info, chromosome, offspring, method = "chang
   position_result <- position_result %>% 
     filter(Note != "Duplication") %>% 
     select(-Note, -ID) %>% 
-    arrange(Offspring, Chromosome_origin, !!pos_col) %>% 
+    arrange(!!ifelse(length(offspring) > 2, "Offspring", ""), Chromosome_origin, !!pos_col) %>% 
     nest(input = all_of(pos_col)) %>% 
     mutate(output = map(input, function(tb) tibble(ID = seq(1,nrow(tb))))) %>% 
     unnest(cols = c("input", "output")) %>% 
-    select(Offspring, Chromosome_origin, ID, all_of(pos_col), everything())
+    select(all_of(ifelse(length(offspring) > 2, c("Offspring", "Chromosome_origin"), "Chromosome_origin")), ID, all_of(pos_col), everything())
   
   comparison_result <- bind_rows(comparison_result_pat, comparison_result_mat) 
   
