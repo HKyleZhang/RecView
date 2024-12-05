@@ -25,7 +25,30 @@ plot.RecView <- function(obj) {
   
   comparison_result <- bind_rows(comparison_result_pat, comparison_result_mat) %>% 
     distinct(Chromosome_origin, POS_chr, x_group, y_group, Concord_Discord, .keep_all = TRUE) %>% 
-    arrange(Chromosome_origin, POS_chr)
+    arrange(Chromosome_origin, POS_chr) %>% 
+    nest(input = !c("x_group", "y_group", "Chromosome_origin"))
+  
+  for (i in 1:nrow(comparison_result)) {
+    if (comparison_result$Chromosome_origin[i] == "Paternal") {
+      x_group_tmp <- comparison_result$x_group[i]
+      y_group_tmp <- comparison_result$y_group[i]
+      
+      if (which(offspring == x_group_tmp) > which(offspring == y_group_tmp)) {
+        comparison_result$x_group[i] <- y_group_tmp
+        comparison_result$y_group[i] <- x_group_tmp
+      }
+    } else {
+      x_group_tmp <- comparison_result$x_group[i]
+      y_group_tmp <- comparison_result$y_group[i]
+      
+      if (which(offspring == x_group_tmp) < which(offspring == y_group_tmp)) {
+        comparison_result$x_group[i] <- y_group_tmp
+        comparison_result$y_group[i] <- x_group_tmp
+      }
+    }
+  }
+  comparison_result <- comparison_result %>% 
+    unnest(cols = "input")
   comparison_result$CHROM <- factor(comparison_result$CHROM, levels = unique(comparison_result$CHROM))
   comparison_result$Chromosome_origin <- factor(comparison_result$Chromosome_origin, levels = c("Paternal", "Maternal"))
   comparison_result$x_group <- factor(comparison_result$x_group, levels = offspring)
@@ -37,6 +60,8 @@ plot.RecView <- function(obj) {
     gather(key = "minmax", value = "POS_chr", c("min", "max")) %>% 
     separate(col = "group", into = c("x_group", "y_group"), sep = "_<>_")
   scaffold_indication$CHROM <- factor(scaffold_indication$CHROM, levels = unique(comparison_result$CHROM))
+  scaffold_indication$x_group <- factor(scaffold_indication$x_group, levels = offspring)
+  scaffold_indication$y_group <- factor(scaffold_indication$y_group, levels = offspring)
   
   # Plotting setting-related >>>>
   macaron_mod <- c("#940214", "#3e1f16", "#123358", "#e8c001", "#015c7a", "#85ab87", "#d75624", "#dd395a")
@@ -96,7 +121,7 @@ plot.RecView <- function(obj) {
                        limits = c(-x_axis_max*0.01, x_axis_max*1.01), 
                        expand = c(0,0)) +
     scale_y_continuous(breaks = c(-0.5, 0,1), labels = c("Scaffold", "Concord", "Discord")) +
-    scale_color_manual(values = c("grey15", "grey45", colour_scheme)) +
+    scale_color_manual(values = c("black", "#AEB6E5", colour_scheme)) +
     guides(color = guide_legend(override.aes = list(size=8))) +
     labs(x = "Position (Mb)", color = "Legend") +
     facet_grid(rows = vars(y_group), cols = vars(x_group)) +
