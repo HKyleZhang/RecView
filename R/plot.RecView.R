@@ -7,7 +7,7 @@
 plot.RecView <- function(obj) {
   cat('Plotting...')
   
-  offspring <- obj$offspring
+  offspring <- pull(obj$offspring, "Offspring")
   comparison_result <- obj$pairwise_comparison %>% 
     filter(!is.na(Concord_Discord))
   
