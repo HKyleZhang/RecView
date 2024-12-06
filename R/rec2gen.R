@@ -164,31 +164,7 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
         unnest(cols = c("input", "n"))
     }
     
-    # rec_num_Q <- matrix(data = rep(NA, times = nrow(data_chr_mod$dm[[1]])*ncol(data_chr_mod$dm[[1]])), nrow = nrow(data_chr_mod$dm[[1]]), ncol = ncol(data_chr_mod$dm[[1]]))
-    # for (i in 1:(nrow(rec_num_Q)-1)) {
-    #   for (j in (i+1):ncol(rec_num_Q)) {
-    #     concord_discord <- data_chr_mod %>%
-    #       ungroup() %>%
-    #       mutate(output = map(dm, function(tb) tibble(Concord_Discord = tb[i,j]))) %>%
-    #       unnest(cols = c("input", "output")) %>%
-    #       arrange(POS_chr) %>%
-    #       select(POS_chr, Concord_Discord) %>%
-    #       filter(!is.na(Concord_Discord))
-    # 
-    #     if (method == "changepoint") {
-    #       cpt <- changepoint::cpt.mean(pull(concord_discord, "Concord_Discord"), minseglen = 1)
-    #       rec_num_Q[j,i] <- length(changepoint::cpts(cpt))
-    #     } else if (method == "PD") {
-    #       cpt <- PD_algorithm(x = concord_discord, value_col = "Concord_Discord", window_size = ifelse(is.null(method_args$window_size), 400, method_args$window_size), threshold = ifelse(is.null(method_args$threshold), 0.8, method_args$threshold), full_result = FALSE)
-    #       rec_num_Q[j,i] <- length(cpt)
-    #     } else if (method == "CCS") {
-    #       rec_num_Q[j,i] <- CCS_algorithm(x = concord_discord, value_col = "Concord_Discord", threshold = ifelse(is.null(method_args$threshold), 50, method_args$threshold), full_result = FALSE) %>%
-    #         nrow()
-    #     }
-    #   }
-    # }
-    
-    off_no_rec <- vector()
+    off_no_rec <- tibble(Offspring = offspring, n = 0)
     for (i in 1:(length(offspring)-2)) {
       for (j in (i+1):(length(offspring)-1)) {
         for (k in (j+1):length(offspring)) {
@@ -200,22 +176,29 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
           Dmax_index <- which(D == max(D))
           if (length(Dmax_index) == 1) {
             if(max(D) == sum(D[which(D != max(D))])) {
-              off_no_rec <- unique(c(off_no_rec, offspring[c(i,j,k)[which(!(c(i,j,k) %in% comp_index[[Dmax_index]]))]]))
+              off_no_rec$n[off_no_rec$Offspring == offspring[c(i,j,k)[which(!(c(i,j,k) %in% comp_index[[Dmax_index]]))]]] <- off_no_rec$n[off_no_rec$Offspring == offspring[c(i,j,k)[which(!(c(i,j,k) %in% comp_index[[Dmax_index]]))]]] + 1
+              # off_no_rec <- unique(c(off_no_rec, offspring[c(i,j,k)[which(!(c(i,j,k) %in% comp_index[[Dmax_index]]))]]))
             } else if (length(which(D == 0)) > 0) {
-              off_no_rec <- unique(c(off_no_rec, offspring[unique(unlist(comp_index[which(D == 0)]))]))
+              off_no_rec$n[off_no_rec$Offspring == offspring[unique(unlist(comp_index[which(D == 0)]))]] <- off_no_rec$n[off_no_rec$Offspring == offspring[unique(unlist(comp_index[which(D == 0)]))]] + 1
+              # off_no_rec <- unique(c(off_no_rec, offspring[unique(unlist(comp_index[which(D == 0)]))]))
             }
           }
         }
       }
     }
   }
-  off_no_rec_pat <- off_no_rec
+  off_no_rec_pat <- off_no_rec %>% 
+    filter(n == max(n), n > 0) %>% 
+    # filter(n == (length(offspring)-1)*(length(offspring)-2)/2) %>% 
+    pull(Offspring)
   
-  if (length(off_no_rec) != 0) {
+  if (length(off_no_rec_pat) != 0) {
+    cat(paste0("\n- Note: Found ", length(off_no_rec_pat) ," individual(s) without recombination on paternal chromosome."))
+    
     res_pat <- tibble(Offspring = offspring) %>% 
-      filter(!(Offspring %in% off_no_rec)) %>% 
+      filter(!(Offspring %in% off_no_rec_pat)) %>% 
       rowwise() %>% 
-      mutate(output = list(RecView:::rec2gen_internal(data = data, scaffold_info = scaffold_info, chromosome = chromosome, offspring = c(Offspring, off_no_rec), side = "Paternal", method = method, method_args = method_args, verbose = FALSE)))
+      mutate(output = list(RecView:::rec2gen_internal(data = data, scaffold_info = scaffold_info, chromosome = chromosome, offspring = c(Offspring, off_no_rec_pat), side = "Paternal", method = method, method_args = method_args, verbose = FALSE)))
     
     position_result_pat <- list()
     comparison_result_pat <- list()
@@ -231,6 +214,14 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
     position_result_pat <- res_pat$recombination_position
     comparison_result_pat <- res_pat$pairwise_comparison
   }
+  
+  dup <- position_result_pat %>% 
+      group_by_at(pos_col) %>% 
+      tally() %>% 
+      filter(n > 1) %>% 
+      get(pos_col, .)
+  
+  position_result_pat <- position_result_pat %>% filter(!(get(pos_col, .) %in% dup))
   
   end_time <- Sys.time()
   msg <- paste0('\nStep 2/4: Paternal chromosome analysis completed. Used ', round(as.numeric(difftime(time1 = end_time, time2 = start_time, units = "secs")), 3), " sec.")
@@ -329,31 +320,7 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
         unnest(cols = c("input", "n"))
     }
     
-    # rec_num_Q <- matrix(data = rep(NA, times = nrow(data_chr_mod$dm[[1]])*ncol(data_chr_mod$dm[[1]])), nrow = nrow(data_chr_mod$dm[[1]]), ncol = ncol(data_chr_mod$dm[[1]]))
-    # for (i in 1:(nrow(rec_num_Q)-1)) {
-    #   for (j in (i+1):ncol(rec_num_Q)) {
-    #     concord_discord <- data_chr_mod %>%
-    #       ungroup() %>%
-    #       mutate(output = map(dm, function(tb) tibble(Concord_Discord = tb[i,j]))) %>%
-    #       unnest(cols = c("input", "output")) %>%
-    #       arrange(POS_chr) %>%
-    #       select(POS_chr, Concord_Discord) %>%
-    #       filter(!is.na(Concord_Discord))
-    # 
-    #     if (method == "changepoint") {
-    #       cpt <- changepoint::cpt.mean(pull(concord_discord, "Concord_Discord"), minseglen = 1)
-    #       rec_num_Q[j,i] <- length(changepoint::cpts(cpt))
-    #     } else if (method == "PD") {
-    #       cpt <- PD_algorithm(x = concord_discord, value_col = "Concord_Discord", window_size = ifelse(is.null(method_args$window_size), 400, method_args$window_size), threshold = ifelse(is.null(method_args$threshold), 0.8, method_args$threshold), full_result = FALSE)
-    #       rec_num_Q[j,i] <- length(cpt)
-    #     } else if (method == "CCS") {
-    #       rec_num_Q[j,i] <- CCS_algorithm(x = concord_discord, value_col = "Concord_Discord", threshold = ifelse(is.null(method_args$threshold), 50, method_args$threshold), full_result = FALSE) %>%
-    #         nrow()
-    #     }
-    #   }
-    # }
-    
-    off_no_rec <- vector()
+    off_no_rec <- tibble(Offspring = offspring, n = 0)
     for (i in 1:(length(offspring)-2)) {
       for (j in (i+1):(length(offspring)-1)) {
         for (k in (j+1):length(offspring)) {
@@ -365,22 +332,29 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
           Dmax_index <- which(D == max(D))
           if (length(Dmax_index) == 1) {
             if(max(D) == sum(D[which(D != max(D))])) {
-              off_no_rec <- unique(c(off_no_rec, offspring[c(i,j,k)[which(!(c(i,j,k) %in% comp_index[[Dmax_index]]))]]))
+              off_no_rec$n[off_no_rec$Offspring == offspring[c(i,j,k)[which(!(c(i,j,k) %in% comp_index[[Dmax_index]]))]]] <- off_no_rec$n[off_no_rec$Offspring == offspring[c(i,j,k)[which(!(c(i,j,k) %in% comp_index[[Dmax_index]]))]]] + 1
+              # off_no_rec <- unique(c(off_no_rec, offspring[c(i,j,k)[which(!(c(i,j,k) %in% comp_index[[Dmax_index]]))]]))
+            } else if (length(which(D == 0)) > 0) {
+              off_no_rec$n[off_no_rec$Offspring == offspring[unique(unlist(comp_index[which(D == 0)]))]] <- off_no_rec$n[off_no_rec$Offspring == offspring[unique(unlist(comp_index[which(D == 0)]))]] + 1
+              # off_no_rec <- unique(c(off_no_rec, offspring[unique(unlist(comp_index[which(D == 0)]))]))
             }
-          } else if (length(which(D == 0)) > 0) {
-            off_no_rec <- unique(c(off_no_rec, offspring[unique(unlist(comp_index[which(D == 0)]))]))
           }
         }
       }
     }
   }
-  off_no_rec_mat <- off_no_rec  
+  off_no_rec_mat <- off_no_rec %>% 
+    filter(n == max(n), n > 0) %>% 
+    # filter(n == (length(offspring)-1)*(length(offspring)-2)/2) %>% 
+    pull(Offspring)  
   
-  if (length(off_no_rec) != 0) {
+  if (length(off_no_rec_mat) != 0) {
+    cat(paste0("\n- Note: Found ", length(off_no_rec_mat) ," individuals without recombination on maternal chromosome."))
+    
     res_mat <- tibble(Offspring = offspring) %>% 
-      filter(!(Offspring %in% off_no_rec)) %>% 
+      filter(!(Offspring %in% off_no_rec_mat)) %>% 
       rowwise() %>% 
-      mutate(output = list(RecView:::rec2gen_internal(data = data, scaffold_info = scaffold_info, chromosome = chromosome, offspring = c(Offspring, off_no_rec), side = "Maternal", method = method, method_args = method_args, verbose = FALSE)))
+      mutate(output = list(RecView:::rec2gen_internal(data = data, scaffold_info = scaffold_info, chromosome = chromosome, offspring = c(Offspring, off_no_rec_mat), side = "Maternal", method = method, method_args = method_args, verbose = FALSE)))
     
     position_result_mat <- list()
     comparison_result_mat <- list()
@@ -396,6 +370,14 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
     position_result_mat <- res_mat$recombination_position
     comparison_result_mat <- res_mat$pairwise_comparison
   }
+  
+  dup <- position_result_mat %>% 
+    group_by_at(pos_col) %>% 
+    tally() %>% 
+    filter(n > 1) %>% 
+    get(pos_col, .)
+  
+  position_result_mat <- position_result_mat %>% filter(!(get(pos_col, .) %in% dup))
   
   end_time <- Sys.time()
   msg <- paste0('\nStep 3/4: Maternal chromosome analysis completed. Used ', round(as.numeric(difftime(time1 = end_time, time2 = start_time, units = "secs")), 3), " sec.")
@@ -423,11 +405,11 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
   cat(msg)
   
   out <- list(chromosome = chromosome,
+              method = method,
+              method_args = method_args,
               offspring = left_join(tibble(Offspring = offspring), tibble(Offspring = off_no_rec_pat, Paternal_chromosome = "No_recombination"), by = "Offspring") %>% 
                 left_join(tibble(Offspring = off_no_rec_mat, Maternal_chromosome = "No_recombination"), by = "Offspring") %>% 
                 replace_na(list(Paternal_chromosome = "", Maternal_chromosome = "")), 
-              method = method,
-              method_args = method_args,
               pairwise_comparison = comparison_result, 
               recombination_position = position_result)
   
