@@ -101,6 +101,10 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
       select(-condition_1, -condition_2, -keep)
   }
   
+  infosite_tb <- tibble(Offspring = offspring) %>% 
+    rowwise() %>% 
+    mutate(Paternal = length(which(!is.na(pull(data_chr_mod, Offspring)))))
+  
   data_chr_mod <- data_chr_mod %>% 
     select(-diffAB_CD, -sumAB_CD, -minAB_CD) %>% 
     select(id, CHROM, orientation, POS, POS_chr, all_of(offspring)) %>% 
@@ -257,6 +261,11 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
       select(-condition_1, -condition_2, -keep)
   }
   
+  infosite_tb <- infosite_tb %>% 
+    rowwise() %>% 
+    mutate(Maternal = length(which(!is.na(pull(data_chr_mod, Offspring))))) %>% 
+    ungroup()
+  
   data_chr_mod <- data_chr_mod %>% 
     select(-diffAB_CD, -sumAB_CD, -minAB_CD) %>% 
     select(id, CHROM, orientation, POS, POS_chr, all_of(offspring)) %>% 
@@ -395,7 +404,7 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
     nest(input = all_of(pos_col)) %>% 
     mutate(output = map(input, function(tb) tibble(ID = seq(1,nrow(tb))))) %>% 
     unnest(cols = c("input", "output")) %>% 
-    select(all_of(if (length(offspring) > 2) {c("Offspring", "Chromosome_origin")} else {"Chromosome_origin"}), ID, all_of(if (pos_col == "Mean_bp") {c(pos_col, if (length(offspring) > 2) "SE_bp")} else {pos_col}))
+    select(all_of(if (length(offspring) > 2) {c("Offspring", "Chromosome_origin")} else {"Chromosome_origin"}), ID, all_of(if (pos_col == "Mean_bp") {c(pos_col, if (length(offspring) > 2) "SE_bp")} else {pos_col}), Precision, Precision_index)
   
   comparison_result <- bind_rows(comparison_result_pat, comparison_result_mat) %>% 
     distinct(id, CHROM, orientation, POS, POS_chr, group, Concord_Discord, Chromosome_origin)
@@ -410,6 +419,7 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
               offspring = left_join(tibble(Offspring = offspring), tibble(Offspring = off_no_rec_pat, Paternal_chromosome = "No_recombination"), by = "Offspring") %>% 
                 left_join(tibble(Offspring = off_no_rec_mat, Maternal_chromosome = "No_recombination"), by = "Offspring") %>% 
                 replace_na(list(Paternal_chromosome = "", Maternal_chromosome = "")), 
+              informative_site = infosite_tb,
               pairwise_comparison = comparison_result, 
               recombination_position = position_result)
   
@@ -527,6 +537,15 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
           mutate(ID = seq(1,nrow(.)), !!pos_col := as.integer((start_POS + end_POS)/2)) %>% 
           select(ID, all_of(pos_col)) %>% 
           arrange_at(c("ID", pos_col))
+        
+        interval <- 1e4
+        if (max(data_in_mod$POS_chr) / interval < 100) interval <- max(data_in_mod$POS_chr)/100
+        digits <- floor(log10(interval)) + 1
+        position_density_index <- which(hist(get(pos_col, position_result_pass), breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count != 0)
+        infosite_density <- hist(data_in_mod$POS_chr, breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count
+        position_result_pass <- position_result_pass %>% 
+          mutate(Precision = round(interval / infosite_density[position_density_index], digits = 3), 
+                 Precision_index = round((max(data_in_mod$POS_chr) / sum(infosite_density) - interval / infosite_density[position_density_index]) / (max(data_in_mod$POS_chr) / sum(infosite_density)), digits = 1))
       } else {
         position_result <- position_result %>% mutate(n = 0, index = "")
         
@@ -572,20 +591,39 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
               arrange(Mean_bp) %>% 
               mutate(ID = seq(1, nrow(.))) %>% 
               select(ID, Mean_bp, SE_bp)
+            
+            interval <- 1e4
+            if (max(data_in_mod$POS_chr) / interval < 100) interval <- max(data_in_mod$POS_chr)/100
+            digits <- floor(log10(interval)) + 1
+            position_density_index <- which(hist(get(pos_col, position_result_pass), breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count != 0)
+            infosite_density <- hist(data_in_mod$POS_chr, breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count
+            position_result_pass <- position_result_pass %>% 
+              mutate(Precision = round(interval / infosite_density[position_density_index], digits = 3), 
+                     Precision_index = round((max(data_in_mod$POS_chr) / sum(infosite_density) - interval / infosite_density[position_density_index]) / (max(data_in_mod$POS_chr) / sum(infosite_density)), digits = 1))
           } else {
             for (i in 1:nrow(position_result_pass)) {
               index <- as.numeric(str_split_1(position_result_pass$index[i], pattern = ","))
               position_result_pass$start_POS[i] <- max(position_result$start_POS[index])
               position_result_pass$end_POS[i] <- min(position_result$end_POS[index])
             }
+            
             position_result_pass <- position_result_pass %>% 
               mutate(!!pos_col := as.integer((start_POS + end_POS)/2)) %>% 
               arrange_at(pos_col) %>% 
               mutate(ID = seq(1, nrow(.))) %>% 
               select(ID, all_of(pos_col))
+            
+            interval <- 1e4
+            if (max(data_in_mod$POS_chr) / interval < 100) interval <- max(data_in_mod$POS_chr)/100
+            digits <- floor(log10(interval)) + 1
+            position_density_index <- which(hist(get(pos_col, position_result_pass), breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count != 0)
+            infosite_density <- hist(data_in_mod$POS_chr, breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count
+            position_result_pass <- position_result_pass %>% 
+              mutate(Precision = round(interval / infosite_density[position_density_index], digits = 3), 
+                     Precision_index = round((max(data_in_mod$POS_chr) / sum(infosite_density) - interval / infosite_density[position_density_index]) / (max(data_in_mod$POS_chr) / sum(infosite_density)), digits = 1))
           }
         } else {
-          position_result_pass <- tibble(ID = as.numeric(), !!pos_col := as.numeric())
+          position_result_pass <- tibble(ID = as.numeric(), !!pos_col := as.numeric(), Precision = as.numeric(), Precision_index = as.numeric())
         }
       }
     }
@@ -714,6 +752,8 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
                                   Offspring = as.character(),
                                   ID = as.numeric(),
                                   !!pos_col := as.numeric(),
+                                  Precision = as.numeric(),
+                                  Precision_index = as.numeric(),
                                   Note = as.character())
     
     comparison_result_pat <- data_chr_mod$input[[1]] %>% 
@@ -802,6 +842,8 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
                                   Offspring = as.character(),
                                   ID = as.numeric(),
                                   !!pos_col := as.numeric(),
+                                  Precision = as.numeric(),
+                                  Precision_index = as.numeric(),
                                   Note = as.character())
     
     comparison_result_mat <- data_chr_mod$input[[1]] %>% 
@@ -822,11 +864,11 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
       nest(input = all_of(pos_col)) %>% 
       mutate(output = map(input, function(tb) tibble(ID = seq(1,nrow(tb))))) %>% 
       unnest(cols = c("input", "output")) %>% 
-      select(all_of(if (length(offspring) > 2) {c("Offspring", "Chromosome_origin")} else {"Chromosome_origin"}), ID, all_of(if (pos_col == "Mean_bp") {c(pos_col, if (length(offspring) > 2) "SE_bp")} else {pos_col}))
+      select(all_of(if (length(offspring) > 2) {c("Offspring", "Chromosome_origin")} else {"Chromosome_origin"}), ID, all_of(if (pos_col == "Mean_bp") {c(pos_col, if (length(offspring) > 2) "SE_bp")} else {pos_col}), Precision, Precision_index)
   } else {
     position_result <- position_result %>% 
       select(-Note) %>% 
-      select(all_of(if (length(offspring) > 2) {c("Offspring", "Chromosome_origin")} else {"Chromosome_origin"}), ID, all_of(if (pos_col == "Mean_bp") {c(pos_col, if (length(offspring) > 2) "SE_bp")} else {pos_col}))
+      select(all_of(if (length(offspring) > 2) {c("Offspring", "Chromosome_origin")} else {"Chromosome_origin"}), ID, all_of(if (pos_col == "Mean_bp") {c(pos_col, if (length(offspring) > 2) "SE_bp")} else {pos_col}), Precision, Precision_index)
   }
   comparison_result <- bind_rows(comparison_result_pat, comparison_result_mat) 
   
