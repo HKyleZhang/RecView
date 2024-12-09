@@ -327,7 +327,7 @@ recview_server <- function(input, output, session) {
         
         finer_running_difference <- function(input, goo_proportion_diff_tb, tb, side, symbol, radius, finer_step, finer_threshold) {
           i <- input$row_start[1]
-          while (goo_proportion_diff_tb$diff[i] >= finer_threshold) {
+          while (goo_proportion_diff_tb$diff[i] >= finer_threshold && i < nrow(goo_proportion_diff_tb)) {
             i <- i + 1
           }
           cut_point <- seq(goo_proportion_diff_tb$cut_point[ifelse((input$row_start[1] - 1) == 0, 1, input$row_start[1] - 1)] + finer_step, goo_proportion_diff_tb$cut_point[i] - finer_step, finer_step)
@@ -610,7 +610,7 @@ recview_server <- function(input, output, session) {
     }
     
     #### Informative SNP density ----
-    interval <- 1e5
+    interval <- 1e4
     digits <- floor(log10(interval)) + 1
     if (case != 1 && case != 3) {
       breaks_pat <- seq(0, ceiling(max(get("POS_chr", res[[1]] %>% filter(Side == "Paternal")))/10^digits) * 10^digits, interval)
