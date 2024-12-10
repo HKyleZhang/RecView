@@ -539,7 +539,10 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
         interval <- 1e4
         if (max(data_in_mod$POS_chr) / interval < 100) interval <- max(data_in_mod$POS_chr)/100
         digits <- floor(log10(interval)) + 1
-        position_density_index <- which(hist(get(pos_col, position_result_pass), breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count != 0)
+        position_density_index <- vector()
+        for (i in 1:nrow(position_result_pass)) {
+          position_density_index[length(position_density_index)+1] <- which(hist(get(pos_col, position_result_pass[i,]), breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count != 0)
+        }
         infosite_density <- hist(data_in_mod$POS_chr, breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count
         position_result_pass <- position_result_pass %>% 
           mutate(Precision = round(interval / infosite_density[position_density_index], digits = 3), 
@@ -593,7 +596,10 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
             interval <- 1e4
             if (max(data_in_mod$POS_chr) / interval < 100) interval <- max(data_in_mod$POS_chr)/100
             digits <- floor(log10(interval)) + 1
-            position_density_index <- which(hist(get(pos_col, position_result_pass), breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count != 0)
+            position_density_index <- vector()
+            for (i in 1:nrow(position_result_pass)) {
+              position_density_index[length(position_density_index)+1] <- which(hist(get(pos_col, position_result_pass[i,]), breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count != 0)
+            }
             infosite_density <- hist(data_in_mod$POS_chr, breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count
             position_result_pass <- position_result_pass %>% 
               mutate(Precision = round(interval / infosite_density[position_density_index], digits = 3), 
