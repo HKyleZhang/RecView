@@ -397,14 +397,12 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
   position_result <- bind_rows(position_result_pat, position_result_mat)
   position_result$Chromosome_origin <- factor(position_result$Chromosome_origin, levels = c("Paternal", "Maternal"))
   position_result <- position_result %>% 
-    # filter(Note != "Duplication") %>% 
-    # select(-Note, -ID) %>% 
     select(-ID) %>% 
     arrange_at(c(if (length(offspring) > 2) {"Offspring"}, "Chromosome_origin", pos_col)) %>% 
-    nest(input = all_of(pos_col)) %>% 
-    mutate(output = map(input, function(tb) tibble(ID = seq(1,nrow(tb))))) %>% 
-    unnest(cols = c("input", "output")) %>% 
-    select(all_of(if (length(offspring) > 2) {c("Offspring", "Chromosome_origin")} else {"Chromosome_origin"}), ID, all_of(if (pos_col == "Mean_bp") {c(pos_col, if (length(offspring) > 2) "SE_bp")} else {pos_col}), Precision, Precision_index)
+    # nest(input = all_of(pos_col)) %>% 
+    # mutate(output = map(input, function(tb) tibble(ID = seq(1,nrow(tb))))) %>% 
+    # unnest(cols = c("input", "output")) %>% 
+    select(all_of(if (length(offspring) > 2) {c("Offspring", "Chromosome_origin")} else {"Chromosome_origin"}), all_of(if (pos_col == "Mean_bp") {c(pos_col, if (length(offspring) > 2) "SE_bp")} else {pos_col}), Precision, Precision_index)
   
   comparison_result <- bind_rows(comparison_result_pat, comparison_result_mat) %>% 
     distinct(id, CHROM, orientation, POS, POS_chr, group, Concord_Discord, Chromosome_origin)
@@ -616,7 +614,10 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
             interval <- 1e4
             if (max(data_in_mod$POS_chr) / interval < 100) interval <- max(data_in_mod$POS_chr)/100
             digits <- floor(log10(interval)) + 1
-            position_density_index <- which(hist(get(pos_col, position_result_pass), breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count != 0)
+            position_density_index <- vector()
+            for (i in 1:nrow(position_result_pass)) {
+              position_density_index[length(position_density_index)+1] <- which(hist(get(pos_col, position_result_pass[i,]), breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count != 0)
+            }
             infosite_density <- hist(data_in_mod$POS_chr, breaks = seq(0, ceiling(max(data_in_mod$POS_chr/10^digits)) * 10^digits, interval), plot = FALSE)$count
             position_result_pass <- position_result_pass %>% 
               mutate(Precision = round(interval / infosite_density[position_density_index], digits = 3), 
