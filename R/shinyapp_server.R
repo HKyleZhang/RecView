@@ -315,7 +315,11 @@ recview_server <- function(input, output, session) {
         }
         
         find_local_maxima <- function(tb) {
-          tb[which(tb$diff == max(tb$diff)),]
+          tb_max <- tb[which(tb$diff == max(tb$diff)),]
+          if (nrow(tb_max) > 1) {
+            tb_max <- tb_max[nrow(tb_max) %/% 2,]
+          }
+          return(tb_max)
         }
         
         goo_proportion <- function(input, tb, side, symbol) {
