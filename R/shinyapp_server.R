@@ -434,7 +434,7 @@ recview_server <- function(input, output, session) {
           distinct(Side, POS_chr, diff)
         res[[3]]$Side <- factor(res[[3]]$Side, levels = c("Paternal", "Maternal"))
         
-        res1_mod <- res[[1]] %>% select(POS_chr, scaffold_orientation)
+        res1_mod <- res[[1]] %>% distinct(POS_chr, scaffold_orientation)
         res1_mod$POS_chr <- as.character(res1_mod$POS_chr)
         res1_mod$scaffold_orientation <- as.character(res1_mod$scaffold_orientation)
         res[[3]]$POS_chr <- as.character(res[[3]]$POS_chr)
