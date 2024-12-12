@@ -4,16 +4,16 @@
 \alias{PD_algorithm}
 \title{Proportional Difference (PD) algorithm}
 \usage{
-PD_algorithm(x, value_col = "...", window_size = 1100, threshold = 0.8, full_result = FALSE)
+PD_algorithm(x, value_col = "...", window_size = 400, min_threshold = 0.5, full_result = FALSE)
 }
 \arguments{
 \item{x}{a data frame or tibble.}
 
 \item{value_col}{character; the column in which the change points will be analysed. This column should contain binary data, e.g. 0 and 1.}
 
-\item{window_size}{numeric; the size of sliding windows in which the proportion of symbol is checked. Default: 1100.}
+\item{window_size}{numeric; the size of sliding windows in which the proportion of symbol is checked. Default: 400.}
 
-\item{threshold}{numeric; the PD value above which a finer step will taken to locate the change points. Default = 0.8.}
+\item{min_threshold}{numeric; minimal threshold to detect optimal threshold for locating the change points. Default: 0.5.}
 
 \item{full_result}{logical; it indicates whether the full results will be produced.}
 }
