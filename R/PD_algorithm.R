@@ -17,7 +17,11 @@ PD_algorithm <- function(x, value_col, window_size = 1100, threshold = 0.8, full
   }
   
   find_local_maxima <- function(tb) {
-    tb[which(tb$diff == max(tb$diff)),]
+    tb_max <- tb[which(tb$diff == max(tb$diff)),]
+    if (nrow(tb_max) > 1) {
+      tb_max <- tb_max[nrow(tb_max) %/% 2,]
+    }
+    return(tb_max)
   }
   
   get_proportion <- function(input, tb, value_col, symbol) {
@@ -87,7 +91,7 @@ PD_algorithm <- function(x, value_col, window_size = 1100, threshold = 0.8, full
     pull(cut_point)
   
   if (full_result) {
-    out <- list(PD = segment_proportion_diff, PD_local = segment_goo_proportion_finer, changepoint = cps)
+    out <- list(PD = segment_proportion_diff, PD_local = segment_proportion_finer, changepoint = cps)
   } else {
     out <- cps
   }
