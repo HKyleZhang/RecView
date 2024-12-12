@@ -124,9 +124,13 @@ PD_algorithm <- function(x, value_col, window_size = 400, min_threshold = 0.5, f
   } else if (length(uniq_num_peak) == 2) {
     optimal_threshold <- num_peak_tb$threshold[which.max(diff(num_peak_tb$num_peak))+1]
   } else {
-    elbow_index <- jonas_elbow_finder(num_peak_tb$threshold, num_peak_tb$num_peak)[1]
-    if (is.na(elbow_index)) elbow_index <- 0
-    optimal_threshold <- num_peak_tb$threshold[elbow_index + 1]
+    if (diff(num_peak_tb$num_peak)[length(diff(num_peak_tb$num_peak))] == 0) {
+      optimal_threshold <- num_peak_tb$threshold[nrow(num_peak_tb) - which.max(rev(diff(num_peak_tb$num_peak))) + 1]
+    } else {
+      elbow_index <- jonas_elbow_finder(num_peak_tb$threshold, num_peak_tb$num_peak)[1]
+      if (is.na(elbow_index)) elbow_index <- 0
+      optimal_threshold <- num_peak_tb$threshold[elbow_index + 1]
+    }
   }
   
   rows_above_thrshd <- seqle_mod(which(segment_proportion_diff$diff >= optimal_threshold)) %>% 
