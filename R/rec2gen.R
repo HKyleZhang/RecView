@@ -147,26 +147,28 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
       unnest(cols = "input") %>% 
       arrange(POS_chr)
     
-    rec_num_Q <- tibble(comparison = colnames(pairwise_tbs))
-    if (method == "changepoint") {
-      rec_num_Q <- rec_num_Q %>% 
-        rowwise() %>% 
-        mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
-    } else if (method == "PD") {
-      rec_num_Q <- rec_num_Q %>% 
-        mutate(id = seq(1,nrow(.))) %>% 
-        nest(input = !id) %>% 
-        mutate(n = map(input, function(tb) length(PD_algorithm(x = pairwise_tb %>% filter(!is.na(pull(pairwise_tb, tb$comparison))), value_col = tb$comparison, window_size = ifelse(is.null(method_args$window_size), 400, method_args$window_size), threshold = ifelse(is.null(method_args$threshold), 0.8, method_args$threshold), full_result = FALSE)))) %>% 
-        select(input, n) %>% 
-        unnest(cols = c("input", "n"))
-    } else if (method == "CCS") {
-      rec_num_Q <- rec_num_Q %>% 
-        mutate(id = seq(1,nrow(.))) %>% 
-        nest(input = !id) %>% 
-        mutate(n = map(input, function(tb) nrow(CCS_algorithm(x = pairwise_tb %>% filter(!is.na(pull(pairwise_tb, tb$comparison))), value_col = tb$comparison, threshold = ifelse(is.null(method_args$threshold), 50, method_args$threshold), full_result = FALSE)))) %>% 
-        select(input, n) %>% 
-        unnest(cols = c("input", "n"))
-    }
+    rec_num_Q <- tibble(comparison = colnames(pairwise_tbs)) %>% 
+      rowwise() %>% 
+      mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
+    # if (method == "changepoint") {
+    #   rec_num_Q <- rec_num_Q %>% 
+    #     rowwise() %>% 
+    #     mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
+    # } else if (method == "PD") {
+    #   rec_num_Q <- rec_num_Q %>% 
+    #     mutate(id = seq(1,nrow(.))) %>% 
+    #     nest(input = !id) %>% 
+    #     mutate(n = map(input, function(tb) length(PD_algorithm(x = pairwise_tb %>% filter(!is.na(pull(pairwise_tb, tb$comparison))), value_col = tb$comparison, window_size = ifelse(is.null(method_args$window_size), 400, method_args$window_size), threshold = ifelse(is.null(method_args$threshold), 0.8, method_args$threshold), full_result = FALSE)))) %>% 
+    #     select(input, n) %>% 
+    #     unnest(cols = c("input", "n"))
+    # } else if (method == "CCS") {
+    #   rec_num_Q <- rec_num_Q %>% 
+    #     mutate(id = seq(1,nrow(.))) %>% 
+    #     nest(input = !id) %>% 
+    #     mutate(n = map(input, function(tb) nrow(CCS_algorithm(x = pairwise_tb %>% filter(!is.na(pull(pairwise_tb, tb$comparison))), value_col = tb$comparison, threshold = ifelse(is.null(method_args$threshold), 50, method_args$threshold), full_result = FALSE)))) %>% 
+    #     select(input, n) %>% 
+    #     unnest(cols = c("input", "n"))
+    # }
     
     off_no_rec <- tibble(Offspring = offspring, n = 0)
     for (i in 1:(length(offspring)-2)) {
@@ -308,26 +310,28 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
       unnest(cols = "input") %>% 
       arrange(POS_chr)
     
-    rec_num_Q <- tibble(comparison = colnames(pairwise_tbs))
-    if (method == "changepoint") {
-      rec_num_Q <- rec_num_Q %>% 
-        rowwise() %>% 
-        mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
-    } else if (method == "PD") {
-      rec_num_Q <- rec_num_Q %>% 
-        mutate(id = seq(1,nrow(.))) %>% 
-        nest(input = !id) %>% 
-        mutate(n = map(input, function(tb) length(PD_algorithm(x = pairwise_tb %>% filter(!is.na(pull(pairwise_tb, tb$comparison))), value_col = tb$comparison, window_size = ifelse(is.null(method_args$window_size), 400, method_args$window_size), threshold = ifelse(is.null(method_args$threshold), 0.8, method_args$threshold), full_result = FALSE)))) %>% 
-        select(input, n) %>% 
-        unnest(cols = c("input", "n"))
-    } else if (method == "CCS") {
-      rec_num_Q <- rec_num_Q %>% 
-        mutate(id = seq(1,nrow(.))) %>% 
-        nest(input = !id) %>% 
-        mutate(n = map(input, function(tb) nrow(CCS_algorithm(x = pairwise_tb %>% filter(!is.na(pull(pairwise_tb, tb$comparison))), value_col = tb$comparison, threshold = ifelse(is.null(method_args$threshold), 50, method_args$threshold), full_result = FALSE)))) %>% 
-        select(input, n) %>% 
-        unnest(cols = c("input", "n"))
-    }
+    rec_num_Q <- tibble(comparison = colnames(pairwise_tbs)) %>% 
+      rowwise() %>% 
+      mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
+    # if (method == "changepoint") {
+    #   rec_num_Q <- rec_num_Q %>% 
+    #     rowwise() %>% 
+    #     mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
+    # } else if (method == "PD") {
+    #   rec_num_Q <- rec_num_Q %>% 
+    #     mutate(id = seq(1,nrow(.))) %>% 
+    #     nest(input = !id) %>% 
+    #     mutate(n = map(input, function(tb) length(PD_algorithm(x = pairwise_tb %>% filter(!is.na(pull(pairwise_tb, tb$comparison))), value_col = tb$comparison, window_size = ifelse(is.null(method_args$window_size), 400, method_args$window_size), threshold = ifelse(is.null(method_args$threshold), 0.8, method_args$threshold), full_result = FALSE)))) %>% 
+    #     select(input, n) %>% 
+    #     unnest(cols = c("input", "n"))
+    # } else if (method == "CCS") {
+    #   rec_num_Q <- rec_num_Q %>% 
+    #     mutate(id = seq(1,nrow(.))) %>% 
+    #     nest(input = !id) %>% 
+    #     mutate(n = map(input, function(tb) nrow(CCS_algorithm(x = pairwise_tb %>% filter(!is.na(pull(pairwise_tb, tb$comparison))), value_col = tb$comparison, threshold = ifelse(is.null(method_args$threshold), 50, method_args$threshold), full_result = FALSE)))) %>% 
+    #     select(input, n) %>% 
+    #     unnest(cols = c("input", "n"))
+    # }
     
     off_no_rec <- tibble(Offspring = offspring, n = 0)
     for (i in 1:(length(offspring)-2)) {
