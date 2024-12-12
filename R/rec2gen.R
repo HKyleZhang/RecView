@@ -12,7 +12,7 @@
 rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "changepoint", method_args = NULL) {
   if(is.null(method_args)) {
     if (method == "CCS") method_args <- list(threshold = 50, se = FALSE)
-    if (method == "PD") method_args <- list(window_size = 400, threshold = 0.8)
+    if (method == "PD") method_args <- list(window_size = 400, min_threshold = 0.5)
   } else {
     if (method == "CCS") {
       if (is.null(method_args$threshold)) method_args <- list(threshold = 50, se = as.logical(unlist(method_args)))
@@ -20,9 +20,9 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
     }
     
     if (method == "PD") {
-      if (is.null(method_args$window_size)) method_args <- list(window_size = 400, threshold = as.vector(unlist(method_args)))
-      if (is.null(method_args$threshold)) method_args <- list(threshold = 0.8, window_size = as.vector(unlist(method_args)))
-      method_args <- list(window_size = method_args$window_size, threshold = method_args$threshold)
+      if (is.null(method_args$window_size)) method_args <- list(window_size = 400, min_threshold = as.vector(unlist(method_args)))
+      if (is.null(method_args$min_threshold)) method_args <- list(min_threshold = 0.5, window_size = as.vector(unlist(method_args)))
+      method_args <- list(window_size = method_args$window_size, min_threshold = method_args$min_threshold)
     }
   }
   pos_col <- ifelse(method == "CCS", ifelse(method_args$se, "Mean_bp", "Middle_bp"), "Position_bp")
@@ -204,7 +204,7 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
     res_pat <- tibble(Offspring = offspring) %>% 
       filter(!(Offspring %in% off_no_rec_pat)) %>% 
       rowwise() %>% 
-      mutate(output = list(RecView:::rec2gen_internal(data = data, scaffold_info = scaffold_info, chromosome = chromosome, offspring = c(Offspring, off_no_rec_pat), side = "Paternal", method = method, method_args = method_args, verbose = FALSE)))
+      mutate(output = list(RecView:::rec2gen_internal(data = data, scaffold_info = scaffold_info, chromosome = chromosome, offspring = c(Offspring, off_no_rec_pat[sample.int(n = length(off_no_rec_pat), size = 1)]), side = "Paternal", method = method, method_args = method_args, verbose = FALSE)))
     
     position_result_pat <- list()
     comparison_result_pat <- list()
@@ -367,7 +367,7 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
     res_mat <- tibble(Offspring = offspring) %>% 
       filter(!(Offspring %in% off_no_rec_mat)) %>% 
       rowwise() %>% 
-      mutate(output = list(RecView:::rec2gen_internal(data = data, scaffold_info = scaffold_info, chromosome = chromosome, offspring = c(Offspring, off_no_rec_mat), side = "Maternal", method = method, method_args = method_args, verbose = FALSE)))
+      mutate(output = list(RecView:::rec2gen_internal(data = data, scaffold_info = scaffold_info, chromosome = chromosome, offspring = c(Offspring, off_no_rec_mat[sample.int(n = length(off_no_rec_mat), size = 1)]), side = "Maternal", method = method, method_args = method_args, verbose = FALSE)))
     
     position_result_mat <- list()
     comparison_result_mat <- list()
@@ -435,7 +435,7 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
 rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = c("Paternal", "Maternal"), method = "changepoint", method_args = NULL, verbose = TRUE) {
   if(is.null(method_args)) {
     if (method == "CCS") method_args <- list(threshold = 50, se = FALSE)
-    if (method == "PD") method_args <- list(window_size = 400, threshold = 0.8)
+    if (method == "PD") method_args <- list(window_size = 400, min_threshold = 0.5)
   } else {
     if (method == "CCS") {
       if (is.null(method_args$threshold)) method_args <- list(threshold = 50, se = as.logical(unlist(method_args)))
@@ -443,9 +443,9 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
     }
     
     if (method == "PD") {
-      if (is.null(method_args$window_size)) method_args <- list(window_size = 400, threshold = as.vector(unlist(method_args)))
-      if (is.null(method_args$threshold)) method_args <- list(threshold = 0.8, window_size = as.vector(unlist(method_args)))
-      method_args <- list(window_size = method_args$window_size, threshold = method_args$threshold)
+      if (is.null(method_args$window_size)) method_args <- list(window_size = 400, min_threshold = as.vector(unlist(method_args)))
+      if (is.null(method_args$min_threshold)) method_args <- list(min_threshold = 0.5, window_size = as.vector(unlist(method_args)))
+      method_args <- list(window_size = method_args$window_size, min_threshold = method_args$min_threshold)
     }
   }
   pos_col <- ifelse(method == "CCS", ifelse(method_args$se, "Mean_bp", "Middle_bp"), "Position_bp")
@@ -513,14 +513,14 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
     } else if (method == "CCS") {
       for (i in colnames(pairwise_tb)) {
         data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
-        cps[[length(cps)+1]] <- CCS_algorithm(x = data_in_mod_tmp, value_col = i, threshold = ifelse(is.null(method_args$threshold), 50, method_args$threshold), full_result = FALSE) %>% 
+        cps[[length(cps)+1]] <- CCS_algorithm(x = data_in_mod_tmp, value_col = i, threshold = method_args$threshold, full_result = FALSE) %>% 
           mutate(cps_id = length(cps)+1, start_POS = data_in_mod_tmp$POS_chr[start_row], end_POS = data_in_mod_tmp$POS_chr[end_row]) %>% 
           select(cps_id, start_POS, end_POS)
       }
     } else if (method == "PD") {
       for (i in colnames(pairwise_tb)) {
         data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
-        cpt <- PD_algorithm(x = data_in_mod_tmp, value_col = i, window_size = ifelse(is.null(method_args$window_size), 400, method_args$window_size), threshold = ifelse(is.null(method_args$threshold), 0.8, method_args$threshold), full_result = FALSE)
+        cpt <- PD_algorithm(x = data_in_mod_tmp, value_col = i, window_size = method_args$window_size, min_threshold = method_args$min_threshold, full_result = FALSE)
         cps[[length(cps)+1]] <- tibble(cps_id = length(cps)+1,
                                        start_POS = data_in_mod_tmp$POS_chr[cpt],
                                        end_POS = data_in_mod_tmp$POS_chr[cpt])
