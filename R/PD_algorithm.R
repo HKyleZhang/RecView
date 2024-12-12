@@ -118,10 +118,17 @@ PD_algorithm <- function(x, value_col, window_size = 400, min_threshold = 0.5, f
       length()
   }
   
-  elbow_index <- jonas_elbow_finder(num_peak_tb$threshold, num_peak_tb$num_peak)[1]
-  if (is.na(elbow_index)) elbow_index <- 0
-  optimal_threshold <- num_peak_tb$threshold[elbow_index + 1]
-
+  uniq_num_peak <- unique(num_peak_tb$num_peak)
+  if (length(uniq_num_peak) == 1) {
+    optimal_threshold <- num_peak_tb$threshold[1]
+  } else if (length(uniq_num_peak) == 2) {
+    optimal_threshold <- num_peak_tb$threshold[which.max(diff(num_peak_tb$num_peak))+1]
+  } else {
+    elbow_index <- jonas_elbow_finder(num_peak_tb$threshold, num_peak_tb$num_peak)[1]
+    if (is.na(elbow_index)) elbow_index <- 0
+    optimal_threshold <- num_peak_tb$threshold[elbow_index + 1]
+  }
+  
   rows_above_thrshd <- seqle_mod(which(segment_proportion_diff$diff >= optimal_threshold)) %>% 
     discard(is.na)
   if (length(rows_above_thrshd) > 0) {
