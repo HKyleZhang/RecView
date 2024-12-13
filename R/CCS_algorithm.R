@@ -4,10 +4,11 @@
 #' @param x a data frame or tibble.
 #' @param value_col character; the column in which the change points will be analysed. This column should contain binary data, e.g. 0 and 1.
 #' @param threshold numeric; the CCS value above which the segments will be included for locating the change points. Default = 50.
+#' @param symbol character; the character for assigning negative scores.
 #' @param full_result logical; it indicates whether the result having CCS at all rows will be produced, or only the change points otherwise.
 #' 
 #' @export
-CCS_algorithm <- function(x, value_col, threshold = 50, full_result = FALSE) {
+CCS_algorithm <- function(x, value_col, threshold = 50, symbol = NULL, full_result = FALSE) {
   if (nrow(x) != 0) {
     data <- x %>%
       mutate("{paste0(value_col, '_+_1')}" := c(0, pull(.,value_col))[1:length(pull(.,value_col))]) %>% 
@@ -21,32 +22,49 @@ CCS_algorithm <- function(x, value_col, threshold = 50, full_result = FALSE) {
              gt_threshold = ifelse(abs_CCS >= threshold, "Y", "N"))
     
     tb_Ys_list <- list()
-    for (j in 2:length(N_rows)) {
-      if (N_rows[j] - 1 != N_rows[j-1])  {
-        tb_Ys_tmp <- data[(N_rows[j-1] + 1):(N_rows[j] - 1),]
-        
-        if (unique(pull(tb_Ys_tmp, value_col)) == sort(unique(pull(data, value_col)))[2]) {
-          tb_Ys_list[[length(tb_Ys_list)+1]] <- tb_Ys_tmp %>% 
-            mutate(CCS = seq(1,nrow(.)), abs_CCS = rep(nrow(.), times = nrow(.)),
-                   start = min(index) - 1, end = max(index),
-                   gt_threshold = ifelse(abs_CCS >= threshold, "Y", "N"))
-        } else if (unique(pull(tb_Ys_tmp, value_col)) == sort(unique(pull(data, value_col)))[1]) {
-          tb_Ys_list[[length(tb_Ys_list)+1]] <- tb_Ys_tmp %>% 
-            mutate(CCS = seq(-1,-nrow(.),-1), abs_CCS = rep(nrow(.), times = nrow(.)),
-                   start = min(index) - 1, end = max(index),
-                   gt_threshold = ifelse(abs_CCS >= threshold, "Y", "N"))
+    if (length(N_rows) == 1) {
+      tb_Ys_tmp <- data[(N_rows[1] + 1):nrow(data),]
+      
+      if (unique(pull(tb_Ys_tmp, value_col)) != symbol) {
+        tb_Ys_list[[length(tb_Ys_list)+1]] <- tb_Ys_tmp %>% 
+          mutate(CCS = seq(1,nrow(.)), abs_CCS = rep(nrow(.), times = nrow(.)),
+                 start = min(index) - 1, end = max(index),
+                 gt_threshold = ifelse(abs_CCS >= threshold, "Y", "N"))
+      } else if (unique(pull(tb_Ys_tmp, value_col)) == symbol) {
+        tb_Ys_list[[length(tb_Ys_list)+1]] <- tb_Ys_tmp %>% 
+          mutate(CCS = seq(-1,-nrow(.),-1), abs_CCS = rep(nrow(.), times = nrow(.)),
+                 start = min(index) - 1, end = max(index),
+                 gt_threshold = ifelse(abs_CCS >= threshold, "Y", "N"))
+      }
+    } else {
+      
+      for (j in 2:length(N_rows)) {
+        if (N_rows[j] - 1 != N_rows[j-1])  {
+          tb_Ys_tmp <- data[(N_rows[j-1] + 1):(N_rows[j] - 1),]
+          
+          if (unique(pull(tb_Ys_tmp, value_col)) != symbol) {
+            tb_Ys_list[[length(tb_Ys_list)+1]] <- tb_Ys_tmp %>% 
+              mutate(CCS = seq(1,nrow(.)), abs_CCS = rep(nrow(.), times = nrow(.)),
+                     start = min(index) - 1, end = max(index),
+                     gt_threshold = ifelse(abs_CCS >= threshold, "Y", "N"))
+          } else if (unique(pull(tb_Ys_tmp, value_col)) == symbol) {
+            tb_Ys_list[[length(tb_Ys_list)+1]] <- tb_Ys_tmp %>% 
+              mutate(CCS = seq(-1,-nrow(.),-1), abs_CCS = rep(nrow(.), times = nrow(.)),
+                     start = min(index) - 1, end = max(index),
+                     gt_threshold = ifelse(abs_CCS >= threshold, "Y", "N"))
+          }
         }
       }
     }
     
     if (N_rows[length(N_rows)] != nrow(data))  {
       tb_Ys_tmp <- data[(N_rows[length(N_rows)] + 1):nrow(data),]
-      if (unique(pull(tb_Ys_tmp, value_col)) == 1) {
+      if (unique(pull(tb_Ys_tmp, value_col)) != symbol) {
         tb_Ys_list[[length(tb_Ys_list)+1]] <- tb_Ys_tmp %>% 
           mutate(CCS = seq(1,nrow(.)), abs_CCS = rep(nrow(.), times = nrow(.)),
                  start = min(index) - 1, end = max(index),
                  gt_threshold = ifelse(abs_CCS >= threshold, "Y", "N"))
-      } else if (unique(pull(tb_Ys_tmp, value_col)) == 0) {
+      } else if (unique(pull(tb_Ys_tmp, value_col)) == symbol) {
         tb_Ys_list[[length(tb_Ys_list)+1]] <- tb_Ys_tmp %>% 
           mutate(CCS = seq(-1,-nrow(.),-1), abs_CCS = rep(nrow(.), times = nrow(.)),
                  start = min(index) - 1, end = max(index),

@@ -513,7 +513,7 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
     } else if (method == "CCS") {
       for (i in colnames(pairwise_tb)) {
         data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
-        cps[[length(cps)+1]] <- CCS_algorithm(x = data_in_mod_tmp, value_col = i, threshold = method_args$threshold, full_result = FALSE) %>% 
+        cps[[length(cps)+1]] <- CCS_algorithm(x = data_in_mod_tmp, value_col = i, threshold = method_args$threshold, symbol = 0, full_result = FALSE) %>% 
           mutate(cps_id = length(cps)+1, start_POS = data_in_mod_tmp$POS_chr[start_row], end_POS = data_in_mod_tmp$POS_chr[end_row]) %>% 
           select(cps_id, start_POS, end_POS)
       }
