@@ -28,7 +28,6 @@ recview_ui <- function(request) {
         uiOutput(outputId = "chr"),
       ),
       hr(style="border-color: black;"),
-      checkboxGroupInput(inputId = "resolution", label = "Figure resolution:", choices =  "Low", selected = "Low"),
       radioButtons(inputId = "locate", label = "Locate recombination positions?", choices =  c("Yes", "No"), selected = "No"),
       conditionalPanel(
         condition = "input.locate != 'Yes'",
@@ -36,22 +35,10 @@ recview_ui <- function(request) {
       ),
       conditionalPanel(
         condition = "input.locate == 'Yes'",
-        radioButtons(inputId = "algorithm", label = "Algorithm:", choices = c("PD", "CCS"), selected = "CCS"),
+        radioButtons(inputId = "algorithm", label = "Algorithm:", choices = c("PD", "CCS"), selected = "PD"),
         conditionalPanel(
           condition = "input.algorithm == 'PD'",
           textInput(inputId = "radius", label = "Radius", width = "100%", placeholder = "default: 550")
-        ),
-        conditionalPanel(
-          condition = "input.algorithm == 'PD'",
-          textInput(inputId = "step", label = "Step", width = "100%", placeholder = "default: 17")
-        ),
-        conditionalPanel(
-          condition = "input.algorithm == 'PD'",
-          textInput(inputId = "finer_step", label = "Finer step", width = "100%", placeholder = "default: 1")
-        ),
-        conditionalPanel(
-          condition = "input.algorithm == 'PD'",
-          textInput(inputId = "pd_threshold", label = "Threshold to initiate finer step", width = "100%", placeholder = "default: 0.9")
         ),
         conditionalPanel(
           condition = "input.algorithm == 'CCS'",
