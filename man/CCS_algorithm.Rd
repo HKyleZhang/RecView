@@ -13,6 +13,8 @@ CCS_algorithm(x, value_col = "...", threshold = 50, full_result = FALSE)
 
 \item{threshold}{numeric; the CCS value above which the segments will be included for locating the change points. Default = 50.}
 
+\item{symbol}{character; the character for assigning negative scores.}
+
 \item{full_result}{logical; it indicates whether the result having CCS at all rows will be produced, or only the change points otherwise.}
 }
 \description{
