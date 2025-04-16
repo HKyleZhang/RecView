@@ -36,14 +36,15 @@ recview_server <- function(input, output, session) {
       msg_out <- paste0("\nWarning -----------------------\n The genotype file is NOT CSV \n and will be treated as RDS.\n-------------------------------\n",
                         timestamp(prefix = "Timestamp: ", suffix = "", quiet = TRUE),
                         "\n\n")
-      ifcsv <- tryCatch({read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(), progress = FALSE, n_max = 100)}, warning = function(w) {return(FALSE)}, 
-                        finally = cat(msg_out))
+      ifcsv <- tryCatch({read_lines(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 10, progress = FALSE); TRUE}, warning = function(w) FALSE)
       if (!ifcsv) {
+        cat(msg_out)
         all_columns <- fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath, from = 1, to = 1) %>% 
           colnames() %>%
           str_sort(numeric = T)
       } else {
-        all_columns <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(Missing_ind = col_character(),
+        all_columns <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(id = col_character(),
+                                                                                                             Missing_ind = col_character(),
                                                                                                              A = col_character(),
                                                                                                              B = col_character(),
                                                                                                              C = col_character(),
@@ -162,9 +163,9 @@ recview_server <- function(input, output, session) {
   ### 2.2.1 Function to analyse recombination locations ----
   rec_analyse <- function(data, sc_order, chromosome, offspring, loc, alg, thrsd, radius, step, finer_step, finer_threshold) {
     dt_path <- system.file("dictionary", package = "RecView")
-    dictionary <- read_tsv(file = list.files(path = dt_path, pattern = "dict_complete.tsv", full.names = T), col_types = cols()) %>% 
+    dictionary <- read_tsv(file = list.files(path = dt_path, pattern = "dict_complete.tsv", full.names = T), col_types = cols(), progress = FALSE) %>% 
       filter(!(Paternal == "N" & Maternal == "N"))
-    dictionary_miss <- read_tsv(file = list.files(path = dt_path, pattern = "dict_MissingIndividual_complete.tsv", full.names = T), col_types = cols()) %>% 
+    dictionary_miss <- read_tsv(file = list.files(path = dt_path, pattern = "dict_MissingIndividual_complete.tsv", full.names = T), col_types = cols(), progress = FALSE) %>% 
       filter(!(Paternal == "N" & Maternal == "N"))
     if ((chromosome != "Z") && (chromosome != "X")) {
       dictionary <- dictionary %>% filter(Chromosome_type != "Z", Chromosome_type != "X")
@@ -1061,7 +1062,7 @@ recview_server <- function(input, output, session) {
         ch_in[i] <- str_trim(ch_in[i], side = "both")
       }
       
-      ifcsv <- tryCatch({read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(), progress = FALSE, n_max = 100)}, warning = function(w) {return(FALSE)})
+      ifcsv <- tryCatch({read_lines(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 10, progress = FALSE); TRUE}, warning = function(w) FALSE)
       if (!ifcsv) {
         dd_in <- fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath) %>% 
           as_tibble() %>% 
@@ -1073,7 +1074,8 @@ recview_server <- function(input, output, session) {
                  AB = as.character(AB),
                  CD = as.character(CD))
       } else {
-        dd_in <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(Missing_ind = col_character(),
+        dd_in <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(id = col_character(),
+                                                                                                       Missing_ind = col_character(),
                                                                                                        A = col_character(),
                                                                                                        B = col_character(),
                                                                                                        C = col_character(),
