@@ -33,7 +33,12 @@ recview_server <- function(input, output, session) {
   
   output$off <- renderUI({
     if(!is.integer(input$genofile)) {
-      if (grepl(".rds", shinyFiles::parseFilePaths(roots, input$genofile)$name)) {
+      msg_out <- paste0("\nWarning -----------------------\n The genotype file is NOT CSV \n and will be treated as RDS.\n-------------------------------\n",
+                        timestamp(prefix = "Timestamp: ", suffix = "", quiet = TRUE),
+                        "\n\n")
+      ifcsv <- tryCatch({read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(), progress = FALSE, n_max = 100)}, warning = function(w) {return(FALSE)}, 
+                        finally = cat(msg_out))
+      if (!ifcsv) {
         all_columns <- fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath, from = 1, to = 1) %>% 
           colnames() %>%
           str_sort(numeric = T)
@@ -1056,9 +1061,17 @@ recview_server <- function(input, output, session) {
         ch_in[i] <- str_trim(ch_in[i], side = "both")
       }
       
-      if (grepl(".rds", shinyFiles::parseFilePaths(roots, input$genofile)$name)) {
+      ifcsv <- tryCatch({read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(), progress = FALSE, n_max = 100)}, warning = function(w) {return(FALSE)})
+      if (!ifcsv) {
         dd_in <- fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath) %>% 
-          as_tibble()
+          as_tibble() %>% 
+          mutate(Missing_ind = as.character(Missing_ind),
+                 A = as.character(A),
+                 B = as.character(B),
+                 C = as.character(C),
+                 D = as.character(D),
+                 AB = as.character(AB),
+                 CD = as.character(CD))
       } else {
         dd_in <- read_csv(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, col_types = cols(Missing_ind = col_character(),
                                                                                                        A = col_character(),
@@ -1110,7 +1123,9 @@ recview_server <- function(input, output, session) {
                         " cores available.\n - The analysis is run on ", getDoParWorkers(), 
                         " cores.\n - doPar backend registered? ", getDoParRegistered(),
                         ".\n - doPar backend name and version: ", getDoParName(), " version ", getDoParVersion(), 
-                        ".\n------------------------------\n\n")
+                        ".\n------------------------------\n",
+                        timestamp(prefix = "Timestamp: ", suffix = "", quiet = TRUE),
+                        "\n\n")
       cat(msg_out)
       
       p_list_list <- list()
