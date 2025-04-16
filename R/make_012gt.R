@@ -9,7 +9,7 @@
 #'
 #' @export
 make_012gt <- function(gt, F0F1_rename = "no_rename", save_filename = "gt_012.rds", readable = FALSE) {
-  gt <- read_tsv(gt, col_types = cols())
+  gt <- read_tsv(gt, col_types = cols(), progress = FALSE)
   
   out <- tibble(CHROM = gt$CHROM, POS = gt$POS) %>%
     unite(col = "id", c("CHROM", "POS"), sep = ':', remove = FALSE) %>%
