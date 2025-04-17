@@ -36,8 +36,8 @@ recview_server <- function(input, output, session) {
       msg_out <- paste0("\nWarning -----------------------\n The genotype file is NOT CSV \n and will be treated as RDS.\n-------------------------------\n",
                         timestamp(prefix = "Timestamp: ", suffix = "", quiet = TRUE),
                         "\n\n")
-      ifcsv <- tryCatch({read_lines(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 10, progress = FALSE); TRUE}, warning = function(w) FALSE)
-      if (!ifcsv) {
+      ifrds <- tryCatch({fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath, from = 1, to = 1); TRUE}, error = function(e) FALSE)
+      if (ifrds) {
         cat(msg_out)
         all_columns <- fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath, from = 1, to = 1) %>% 
           colnames() %>%
@@ -1062,8 +1062,8 @@ recview_server <- function(input, output, session) {
         ch_in[i] <- str_trim(ch_in[i], side = "both")
       }
       
-      ifcsv <- tryCatch({read_lines(shinyFiles::parseFilePaths(roots, input$genofile)$datapath, n_max = 10, progress = FALSE); TRUE}, warning = function(w) FALSE)
-      if (!ifcsv) {
+      ifrds <- tryCatch({fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath, from = 1, to = 1); TRUE}, error = function(e) FALSE)
+      if (ifrds) {
         dd_in <- fst::read_fst(path = shinyFiles::parseFilePaths(roots, input$genofile)$datapath) %>% 
           as_tibble() %>% 
           mutate(Missing_ind = as.character(Missing_ind),
