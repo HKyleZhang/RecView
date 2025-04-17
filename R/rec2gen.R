@@ -103,7 +103,7 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
   
   infosite_tb <- tibble(Offspring = offspring) %>% 
     rowwise() %>% 
-    mutate(Paternal = length(which(!is.na(pull(data_chr_mod, Offspring)))))
+    mutate(Paternal_chromosome = length(which(!is.na(pull(data_chr_mod, Offspring)))))
   
   data_chr_mod <- data_chr_mod %>% 
     select(-diffAB_CD, -sumAB_CD, -minAB_CD) %>% 
@@ -192,11 +192,14 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
         }
       }
     }
+    
+    off_no_rec_pat <- off_no_rec %>% 
+      filter(n == max(n), n > 0) %>% 
+      # filter(n == (length(offspring)-1)*(length(offspring)-2)/2) %>% 
+      pull(Offspring)
+  } else {
+    off_no_rec_pat <- vector()
   }
-  off_no_rec_pat <- off_no_rec %>% 
-    filter(n == max(n), n > 0) %>% 
-    # filter(n == (length(offspring)-1)*(length(offspring)-2)/2) %>% 
-    pull(Offspring)
   
   if (length(off_no_rec_pat) != 0) {
     cat(paste0("\n- Note: Found ", length(off_no_rec_pat) ," individual(s) without recombination on paternal chromosome."))
@@ -222,10 +225,10 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
   }
   
   dup <- position_result_pat %>% 
-      group_by_at(pos_col) %>% 
-      tally() %>% 
-      filter(n > 1) %>% 
-      get(pos_col, .)
+    group_by_at(pos_col) %>% 
+    tally() %>% 
+    filter(n > 1) %>% 
+    get(pos_col, .)
   
   position_result_pat <- position_result_pat %>% filter(!(get(pos_col, .) %in% dup))
   
@@ -265,7 +268,7 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
   
   infosite_tb <- infosite_tb %>% 
     rowwise() %>% 
-    mutate(Maternal = length(which(!is.na(pull(data_chr_mod, Offspring))))) %>% 
+    mutate(Maternal_chromosome = length(which(!is.na(pull(data_chr_mod, Offspring))))) %>% 
     ungroup()
   
   data_chr_mod <- data_chr_mod %>% 
@@ -355,11 +358,14 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
         }
       }
     }
+    
+    off_no_rec_mat <- off_no_rec %>% 
+      filter(n == max(n), n > 0) %>% 
+      # filter(n == (length(offspring)-1)*(length(offspring)-2)/2) %>% 
+      pull(Offspring) 
+  } else {
+    off_no_rec_mat <- vector()
   }
-  off_no_rec_mat <- off_no_rec %>% 
-    filter(n == max(n), n > 0) %>% 
-    # filter(n == (length(offspring)-1)*(length(offspring)-2)/2) %>% 
-    pull(Offspring)  
   
   if (length(off_no_rec_mat) != 0) {
     cat(paste0("\n- Note: Found ", length(off_no_rec_mat) ," individuals without recombination on maternal chromosome."))
@@ -415,15 +421,25 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
   msg <- paste0('\nStep 4/4: Results collected. Used ', round(as.numeric(difftime(time1 = end_time, time2 = start_time, units = "secs")), 3), " sec.")
   cat(msg)
   
-  out <- list(chromosome = chromosome,
-              method = method,
-              method_args = method_args,
-              offspring = left_join(tibble(Offspring = offspring), tibble(Offspring = off_no_rec_pat, Paternal_chromosome = "No_recombination"), by = "Offspring") %>% 
-                left_join(tibble(Offspring = off_no_rec_mat, Maternal_chromosome = "No_recombination"), by = "Offspring") %>% 
-                replace_na(list(Paternal_chromosome = "", Maternal_chromosome = "")), 
-              informative_site = infosite_tb,
-              pairwise_comparison = comparison_result, 
-              recombination_position = position_result)
+  if (length(offspring) > 2) {
+    out <- list(chromosome = chromosome,
+                method = method,
+                method_args = method_args,
+                offspring = left_join(tibble(Offspring = offspring), tibble(Offspring = off_no_rec_pat, Paternal_chromosome = "No_recombination"), by = "Offspring") %>% 
+                  left_join(tibble(Offspring = off_no_rec_mat, Maternal_chromosome = "No_recombination"), by = "Offspring") %>% 
+                  replace_na(list(Paternal_chromosome = "", Maternal_chromosome = "")), 
+                informative_site = infosite_tb,
+                pairwise_comparison = comparison_result, 
+                recombination_position = position_result)
+  } else {
+    out <- list(chromosome = chromosome,
+                method = method,
+                method_args = method_args,
+                offspring = tibble(Offspring = offspring, Paternal_chromosome = "", Maternal_chromosome = ""), 
+                informative_site = infosite_tb,
+                pairwise_comparison = comparison_result, 
+                recombination_position = position_result)
+  }
   
   cat('\nDone!')
   
