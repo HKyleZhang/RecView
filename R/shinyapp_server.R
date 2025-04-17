@@ -436,12 +436,12 @@ recview_server <- function(input, output, session) {
           distinct(Side, POS_chr, diff)
         res[[3]]$Side <- factor(res[[3]]$Side, levels = c("Paternal", "Maternal"))
         
-        res1_mod <- res[[1]] %>% select(POS_chr, scaffold_orientation)
+        res1_mod <- res[[1]] %>% distinct(POS_chr, scaffold_orientation)
         res1_mod$POS_chr <- as.character(res1_mod$POS_chr)
         res1_mod$scaffold_orientation <- as.character(res1_mod$scaffold_orientation)
         res[[3]]$POS_chr <- as.character(res[[3]]$POS_chr)
         res[[3]] <- left_join(res[[3]], res1_mod, by = "POS_chr") %>%
-          select(Side, scaffold_orientation, everything()) %>%
+          select(Side, scaffold_orientation, POS_chr, POS_chr_mb, diff) %>%
           replace_na(list(scaffold_orientation = "-")) %>%
           `colnames<-`(.,c("Origin", "Scaffold & Orientation", "Chromosomal position (bp)", "Chromosomal position (Mb)", "Abs. GoO prop. diff."))
         
@@ -607,7 +607,7 @@ recview_server <- function(input, output, session) {
         res1_mod$scaffold_orientation <- as.character(res1_mod$scaffold_orientation)
         res[[3]] <- left_join(res[[3]], res1_mod, by = "id") %>%
           select(-id) %>%
-          select(Origin, scaffold_orientation, everything()) %>%
+          select(Origin, scaffold_orientation, POS_chr, POS_chr_mb, Left_boundary, Right_boundary) %>%
           replace_na(list(scaffold_orientation = "-")) %>%
           `colnames<-`(.,c("Origin", "Scaffold & Orientation", "Chromosomal position (bp)", "Chromosomal position (Mb)", "Left boundary (bp)", "Right boundary (bp)"))
         
