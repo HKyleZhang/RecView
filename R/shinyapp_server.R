@@ -433,7 +433,7 @@ recview_server <- function(input, output, session) {
         res[[2]]$Side <- factor(res[[2]]$Side, levels = c("Paternal", "Maternal"))
         
         res[[3]] <- rbind(dd_pat_mod_local_maxima, dd_mat_mod_local_maxima) %>%
-          distinct(Side, POS_chr, diff)
+          distinct(Side, POS_chr, diff, .keep_all = TRUE)
         res[[3]]$Side <- factor(res[[3]]$Side, levels = c("Paternal", "Maternal"))
         
         res1_mod <- res[[1]] %>% distinct(POS_chr, scaffold_orientation)
