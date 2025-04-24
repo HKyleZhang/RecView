@@ -321,7 +321,7 @@ recview_server <- function(input, output, session) {
         }
         
         find_local_maxima <- function(tb) {
-          tb[which(tb$diff == max(tb$diff)),]
+          tb[ifelse(length(which(tb$diff == max(tb$diff))) > 1, seqle_mod(which(tb$diff == max(tb$diff))), which(tb$diff == max(tb$diff))),]
         }
         
         goo_proportion <- function(input, tb, side, symbol) {
