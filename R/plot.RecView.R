@@ -121,7 +121,7 @@ plot.RecView <- function(obj) {
                        limits = c(-x_axis_max*0.01, x_axis_max*1.01), 
                        expand = c(0,0)) +
     scale_y_continuous(breaks = c(-0.5, 0,1), labels = c("Scaffold", "Concord", "Discord")) +
-    scale_color_manual(values = c("black", "#AEB6E5", colour_scheme)) +
+    scale_color_manual(values = c("#1A2A5A", "#689240", colour_scheme)) +
     guides(color = guide_legend(override.aes = list(size=8))) +
     labs(x = "Position (Mb)", color = "Legend") +
     facet_grid(rows = vars(y_group), cols = vars(x_group)) +
