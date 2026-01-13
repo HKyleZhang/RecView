@@ -149,11 +149,11 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
     
     rec_num_Q <- tibble(comparison = colnames(pairwise_tbs)) %>% 
       rowwise() %>% 
-      mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
+      mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1, penalty = "BIC"))))
     # if (method == "changepoint") {
     #   rec_num_Q <- rec_num_Q %>% 
     #     rowwise() %>% 
-    #     mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
+    #     mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1, penalty = "BIC"))))
     # } else if (method == "PD") {
     #   rec_num_Q <- rec_num_Q %>% 
     #     mutate(id = seq(1,nrow(.))) %>% 
@@ -315,11 +315,11 @@ rec2gen <- function(data, scaffold_info, chromosome, offspring, method = "change
     
     rec_num_Q <- tibble(comparison = colnames(pairwise_tbs)) %>% 
       rowwise() %>% 
-      mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
+      mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1, penalty = "BIC"))))
     # if (method == "changepoint") {
     #   rec_num_Q <- rec_num_Q %>% 
     #     rowwise() %>% 
-    #     mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1))))
+    #     mutate(n = length(changepoint::cpts(changepoint::cpt.mean(pull(pairwise_tb %>% filter(!is.na(pull(pairwise_tb, comparison))), comparison), minseglen = 1, penalty = "BIC"))))
     # } else if (method == "PD") {
     #   rec_num_Q <- rec_num_Q %>% 
     #     mutate(id = seq(1,nrow(.))) %>% 
@@ -521,7 +521,7 @@ rec2gen_internal <- function(data, scaffold_info, chromosome, offspring, side = 
     if (method == "changepoint") {
       for (i in colnames(pairwise_tb)) {
         data_in_mod_tmp <- data_in_mod %>% filter(is.na(get(i,.)) == FALSE)
-        cpt <- changepoint::cpt.mean(pull(data_in_mod_tmp, i), minseglen = 1)
+        cpt <- changepoint::cpt.mean(pull(data_in_mod_tmp, i), minseglen = 1, penalty = "BIC")
         cps[[length(cps)+1]] <- tibble(cps_id = length(cps)+1,
                                        start_POS = data_in_mod_tmp$POS_chr[changepoint::cpts(cpt)],
                                        end_POS = data_in_mod_tmp$POS_chr[changepoint::cpts(cpt)])
